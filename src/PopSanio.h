@@ -3,7 +3,7 @@
 #include <SoyApp.h>
 #include <TJob.h>
 #include <TChannel.h>
-
+#include "Sms1130Device.h"
 
 
 
@@ -15,10 +15,11 @@ public:
 	virtual void	AddChannel(std::shared_ptr<TChannel> Channel) override;
 
 	void			OnExit(TJobAndChannel& JobAndChannel);
-	void			OnGetFeature(TJobAndChannel& JobAndChannel);
+	void			OnGetFrame(TJobAndChannel& JobAndChannel);
 	
 public:
 	Soy::Platform::TConsoleApp	mConsoleApp;
+	SoyVideoCapture				mVideoCapture;
 };
 
 

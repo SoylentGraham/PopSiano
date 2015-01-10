@@ -8,6 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		FB5702CE1A6199CA00449FF3 /* TChannelLiteral.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FB5702CC1A6199CA00449FF3 /* TChannelLiteral.cpp */; };
+		FB5702D21A619FB800449FF3 /* libdvbtreceiver_siano_lite.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = FB5702D11A619FB800449FF3 /* libdvbtreceiver_siano_lite.0.dylib */; };
+		FB5702D51A61A19800449FF3 /* Sms1130Device.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FB5702D31A61A19800449FF3 /* Sms1130Device.cpp */; };
+		FB5702D81A61A50500449FF3 /* SoyVideoDevice.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FB5702D61A61A50500449FF3 /* SoyVideoDevice.cpp */; };
 		FB6650CD1A56FD8600DF0A12 /* SoyDebug.mm in Sources */ = {isa = PBXBuildFile; fileRef = FB6650CC1A56FD8600DF0A12 /* SoyDebug.mm */; };
 		FB8A06211A2E5A200099596C /* memheap.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FB8A06201A2E5A200099596C /* memheap.cpp */; };
 		FB8A06531A2E5A7C0099596C /* SoyApp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FB8A06241A2E5A7C0099596C /* SoyApp.cpp */; };
@@ -83,6 +86,12 @@
 		FB5702CB1A5FDC9700449FF3 /* stb_image.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = stb_image.h; path = src/stb/stb_image.h; sourceTree = "<group>"; };
 		FB5702CC1A6199CA00449FF3 /* TChannelLiteral.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = TChannelLiteral.cpp; path = src/TChannelLiteral.cpp; sourceTree = "<group>"; };
 		FB5702CD1A6199CA00449FF3 /* TChannelLiteral.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TChannelLiteral.h; path = src/TChannelLiteral.h; sourceTree = "<group>"; };
+		FB5702CF1A619FAC00449FF3 /* siano */ = {isa = PBXFileReference; lastKnownFileType = folder; name = siano; path = src/siano; sourceTree = SOURCE_ROOT; };
+		FB5702D11A619FB800449FF3 /* libdvbtreceiver_siano_lite.0.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libdvbtreceiver_siano_lite.0.dylib; path = src/siano/libdvbtreceiver_siano_lite.0.dylib; sourceTree = "<group>"; };
+		FB5702D31A61A19800449FF3 /* Sms1130Device.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Sms1130Device.cpp; path = src/Sms1130Device.cpp; sourceTree = SOURCE_ROOT; };
+		FB5702D41A61A19800449FF3 /* Sms1130Device.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Sms1130Device.h; path = src/Sms1130Device.h; sourceTree = SOURCE_ROOT; };
+		FB5702D61A61A50500449FF3 /* SoyVideoDevice.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SoyVideoDevice.cpp; path = src/SoyVideoDevice.cpp; sourceTree = "<group>"; };
+		FB5702D71A61A50500449FF3 /* SoyVideoDevice.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SoyVideoDevice.h; path = src/SoyVideoDevice.h; sourceTree = "<group>"; };
 		FB6650CC1A56FD8600DF0A12 /* SoyDebug.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = SoyDebug.mm; path = src/SoyDebug.mm; sourceTree = "<group>"; };
 		FB8A05931A2E54730099596C /* PopSiano */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = PopSiano; sourceTree = BUILT_PRODUCTS_DIR; };
 		FB8A05A61A2E57700099596C /* PopApp.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = PopApp.xcconfig; path = ../NewChromantics/PopTrack/PopApp.xcconfig; sourceTree = SOURCE_ROOT; };
@@ -215,6 +224,7 @@
 				FBB3284A1A2E75D4003DE7AA /* CoreMedia.framework in Frameworks */,
 				FBB3284B1A2E75D4003DE7AA /* CoreMediaIO.framework in Frameworks */,
 				FBB328471A2E7591003DE7AA /* AVFoundation.framework in Frameworks */,
+				FB5702D21A619FB800449FF3 /* libdvbtreceiver_siano_lite.0.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -227,6 +237,14 @@
 				FB5702CB1A5FDC9700449FF3 /* stb_image.h */,
 			);
 			name = stb;
+			sourceTree = "<group>";
+		};
+		FB5702D01A619FB100449FF3 /* siano */ = {
+			isa = PBXGroup;
+			children = (
+				FB5702D11A619FB800449FF3 /* libdvbtreceiver_siano_lite.0.dylib */,
+			);
+			name = siano;
 			sourceTree = "<group>";
 		};
 		FB8A058A1A2E54730099596C = {
@@ -255,6 +273,10 @@
 		FB8A05951A2E54730099596C /* src */ = {
 			isa = PBXGroup;
 			children = (
+				FB5702D01A619FB100449FF3 /* siano */,
+				FB5702CF1A619FAC00449FF3 /* siano */,
+				FB5702D31A61A19800449FF3 /* Sms1130Device.cpp */,
+				FB5702D41A61A19800449FF3 /* Sms1130Device.h */,
 				FB8A07181A2E6C3E0099596C /* PopSanio.cpp */,
 				FB8A07191A2E6C3E0099596C /* PopSanio.h */,
 			);
@@ -270,6 +292,8 @@
 				FBC3A0E01A308648009DA49E /* SoyScope.h */,
 				FB8A07141A2E6B990099596C /* sha1 */,
 				FB8A06231A2E5A7C0099596C /* SortArray.h */,
+				FB5702D61A61A50500449FF3 /* SoyVideoDevice.cpp */,
+				FB5702D71A61A50500449FF3 /* SoyVideoDevice.h */,
 				FB8A06241A2E5A7C0099596C /* SoyApp.cpp */,
 				FB8A06251A2E5A7C0099596C /* SoyApp.h */,
 				FB8A06261A2E5A7C0099596C /* SoyArray.cpp */,
@@ -497,6 +521,7 @@
 				FB8A06991A2E6AB50099596C /* TProtocolHttp.cpp in Sources */,
 				FB5702CE1A6199CA00449FF3 /* TChannelLiteral.cpp in Sources */,
 				FB8A06A51A2E6AF80099596C /* TChannel.cpp in Sources */,
+				FB5702D51A61A19800449FF3 /* Sms1130Device.cpp in Sources */,
 				FB8A070E1A2E6B520099596C /* TimeConstraint.cpp in Sources */,
 				FB8A06A81A2E6AF80099596C /* TChannelSocket.cpp in Sources */,
 				FB8A06561A2E5A7C0099596C /* SoyEvent.cpp in Sources */,
@@ -519,6 +544,7 @@
 				FB8A06EE1A2E6B520099596C /* Checks.cpp in Sources */,
 				FB8A06F21A2E6B520099596C /* MemoryOutStream.cpp in Sources */,
 				FB8A06EF1A2E6B520099596C /* CurrentTest.cpp in Sources */,
+				FB5702D81A61A50500449FF3 /* SoyVideoDevice.cpp in Sources */,
 				FB8A06A71A2E6AF80099596C /* TChannelPipe.cpp in Sources */,
 				FB8A06F51A2E6B520099596C /* ReportAssert.cpp in Sources */,
 				FB8A06A61A2E6AF80099596C /* TChannelFile.cpp in Sources */,
@@ -559,6 +585,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/**";
 				MTL_ENABLE_DEBUG_INFO = YES;
 				POP_DIR = ../NewChromantics/PopTrack/;
 				SOYLENT_DIR = ../NewChromantics/ofxSoylent/;
@@ -588,6 +615,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/**";
 				MTL_ENABLE_DEBUG_INFO = NO;
 				POP_DIR = ../NewChromantics/PopTrack/;
 				SOYLENT_DIR = ../NewChromantics/ofxSoylent/;
@@ -597,6 +625,10 @@
 		FB8A059B1A2E54730099596C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/PopCapture/src/siano",
+				);
 				PRODUCT_NAME = PopSiano;
 			};
 			name = Debug;
@@ -604,6 +636,10 @@
 		FB8A059C1A2E54730099596C /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/PopCapture/src/siano",
+				);
 				PRODUCT_NAME = PopSiano;
 			};
 			name = Release;

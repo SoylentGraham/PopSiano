@@ -10,16 +10,17 @@
 #include <SoyString.h>
 #include <SortArray.h>
 #include <TChannelLiteral.h>
+#include "Sms1130Device.h"
+
 
 TPopSanio::TPopSanio()
 {
+	std::shared_ptr<SoyVideoContainer> SianoContainer( new class SianoContainer() );
+	mVideoCapture.AddContainer( SianoContainer );
+
 	AddJobHandler("exit", TParameterTraits(), *this, &TPopSanio::OnExit );
 		
-	TParameterTraits GetFeatureTraits;
-	GetFeatureTraits.mAssumedKeys.PushBack("x");
-	GetFeatureTraits.mAssumedKeys.PushBack("y");
-	GetFeatureTraits.mRequiredKeys.PushBack("image");
-	AddJobHandler("getfeature", GetFeatureTraits, *this, &TPopSanio::OnGetFeature );
+	AddJobHandler("getframe", TParameterTraits(), *this, &TPopSanio::OnGetFrame );
 }
 
 void TPopSanio::AddChannel(std::shared_ptr<TChannel> Channel)
@@ -43,9 +44,58 @@ void TPopSanio::OnExit(TJobAndChannel& JobAndChannel)
 }
 
 
-void TPopSanio::OnGetFeature(TJobAndChannel& JobAndChannel)
+void TPopSanio::OnGetFrame(TJobAndChannel& JobAndChannel)
 {
-	auto& Job = JobAndChannel.GetJob();
+	const TJob& Job = JobAndChannel;
+	TJobReply Reply( JobAndChannel );
+	
+	auto Serial = Job.mParams.GetParamAs<std::string>("serial");
+	auto AsMemFile = Job.mParams.GetParamAsWithDefault<bool>("memfile",true);
+	
+	std::stringstream Error;
+	auto Device = mVideoCapture.GetDevice( Serial, Error );
+	
+	if ( !Device )
+	{
+		std::stringstream ReplyError;
+		ReplyError << "Device " << Serial << " not found " << Error.str();
+		Reply.mParams.AddErrorParam( ReplyError.str() );
+		TChannel& Channel = JobAndChannel;
+		Channel.OnJobCompleted( Reply );
+		return;
+	}
+	
+	//	grab pixels
+	auto& LastFrame = Device->GetLastFrame( Error );
+	if ( LastFrame.IsValid() )
+	{
+		if ( AsMemFile )
+		{
+			TYPE_MemFile MemFile( LastFrame.mPixels.mMemFileArray );
+			Reply.mParams.AddDefaultParam( MemFile );
+		}
+		else
+		{
+			SoyPixels Pixels;
+			Pixels.Copy( LastFrame.mPixels );
+			Reply.mParams.AddDefaultParam( Pixels );
+		}
+	}
+	
+	//	add error if present (last frame could be out of date)
+	if ( !Error.str().empty() )
+		Reply.mParams.AddErrorParam( Error.str() );
+	
+	//	add other stats
+	auto FrameRate = Device->GetFps();
+	auto FrameMs = Device->GetFrameMs();
+	Reply.mParams.AddParam("fps", FrameRate);
+	Reply.mParams.AddParam("framems", FrameMs );
+	Reply.mParams.AddParam("serial", Device->GetMeta().mSerial );
+	
+	TChannel& Channel = JobAndChannel;
+	Channel.OnJobCompleted( Reply );
+	
 }
 
 

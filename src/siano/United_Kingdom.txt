@@ -1,0 +1,4 @@
+COUNTRY=United Kingdom
+FLAG=/u/United Kingdom(Great Britain).png
+0 8000000
+
