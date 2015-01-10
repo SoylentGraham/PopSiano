@@ -84,7 +84,7 @@
 		FB5702CC1A6199CA00449FF3 /* TChannelLiteral.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = TChannelLiteral.cpp; path = src/TChannelLiteral.cpp; sourceTree = "<group>"; };
 		FB5702CD1A6199CA00449FF3 /* TChannelLiteral.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TChannelLiteral.h; path = src/TChannelLiteral.h; sourceTree = "<group>"; };
 		FB6650CC1A56FD8600DF0A12 /* SoyDebug.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = SoyDebug.mm; path = src/SoyDebug.mm; sourceTree = "<group>"; };
-		FB8A05931A2E54730099596C /* PopSanio */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = PopSanio; sourceTree = BUILT_PRODUCTS_DIR; };
+		FB8A05931A2E54730099596C /* PopSiano */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = PopSiano; sourceTree = BUILT_PRODUCTS_DIR; };
 		FB8A05A61A2E57700099596C /* PopApp.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = PopApp.xcconfig; path = ../NewChromantics/PopTrack/PopApp.xcconfig; sourceTree = SOURCE_ROOT; };
 		FB8A06201A2E5A200099596C /* memheap.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = memheap.cpp; path = ../ofxSoylent/src/memheap.cpp; sourceTree = "<group>"; };
 		FB8A06231A2E5A7C0099596C /* SortArray.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SortArray.h; path = ../ofxSoylent/src/SortArray.h; sourceTree = "<group>"; };
@@ -247,7 +247,7 @@
 		FB8A05941A2E54730099596C /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				FB8A05931A2E54730099596C /* PopSanio */,
+				FB8A05931A2E54730099596C /* PopSiano */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -422,9 +422,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		FB8A05921A2E54730099596C /* PopSanio */ = {
+		FB8A05921A2E54730099596C /* PopSiano */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = FB8A059A1A2E54730099596C /* Build configuration list for PBXNativeTarget "PopSanio" */;
+			buildConfigurationList = FB8A059A1A2E54730099596C /* Build configuration list for PBXNativeTarget "PopSiano" */;
 			buildPhases = (
 				FB8A058F1A2E54730099596C /* Sources */,
 				FB8A05901A2E54730099596C /* Frameworks */,
@@ -434,9 +434,9 @@
 			);
 			dependencies = (
 			);
-			name = PopSanio;
+			name = PopSiano;
 			productName = PopCapture;
-			productReference = FB8A05931A2E54730099596C /* PopSanio */;
+			productReference = FB8A05931A2E54730099596C /* PopSiano */;
 			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
@@ -453,7 +453,7 @@
 					};
 				};
 			};
-			buildConfigurationList = FB8A058E1A2E54730099596C /* Build configuration list for PBXProject "PopSanio" */;
+			buildConfigurationList = FB8A058E1A2E54730099596C /* Build configuration list for PBXProject "PopSiano" */;
 			compatibilityVersion = "Xcode 3.2";
 			developmentRegion = English;
 			hasScannedForEncodings = 0;
@@ -465,7 +465,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				FB8A05921A2E54730099596C /* PopSanio */,
+				FB8A05921A2E54730099596C /* PopSiano */,
 			);
 		};
 /* End PBXProject section */
@@ -597,21 +597,21 @@
 		FB8A059B1A2E54730099596C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				PRODUCT_NAME = PopSanio;
+				PRODUCT_NAME = PopSiano;
 			};
 			name = Debug;
 		};
 		FB8A059C1A2E54730099596C /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				PRODUCT_NAME = PopSanio;
+				PRODUCT_NAME = PopSiano;
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		FB8A058E1A2E54730099596C /* Build configuration list for PBXProject "PopSanio" */ = {
+		FB8A058E1A2E54730099596C /* Build configuration list for PBXProject "PopSiano" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				FB8A05981A2E54730099596C /* Debug */,
@@ -620,7 +620,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		FB8A059A1A2E54730099596C /* Build configuration list for PBXNativeTarget "PopSanio" */ = {
+		FB8A059A1A2E54730099596C /* Build configuration list for PBXNativeTarget "PopSiano" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				FB8A059B1A2E54730099596C /* Debug */,
