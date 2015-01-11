@@ -4,6 +4,8 @@
 #include <SoyVideoDevice.h>
 
 
+//	in cpp to reduce includes
+class TSianoLib;
 
 
 //	runtime device
@@ -38,11 +40,15 @@ public:
 	virtual std::shared_ptr<TVideoDevice>	AllocDevice(const std::string& Serial,std::stringstream& Error) override;
 	
 private:
-	void				Shutdown();
 	virtual bool		Iteration();
 	bool				CreateContext(std::stringstream& Error);
 
 private:
+	bool				InitLib(std::stringstream& Error);
+	void				DestroyLib();
+	
+private:
+	std::shared_ptr<TSianoLib>		mLib;		//	may move to device
 	std::shared_ptr<SianoDevice>	mDevice;	//	only one device
 };
 
