@@ -413,46 +413,114 @@ public:
 class TryRegisterDeviceParams
 {
 public:
-	uint32	mRemainingCalls;
-	uint32*	mVendorId;	//	b008xxxx	stack+f70	112
+	uint32	mDeviceIndex;
 	uint32*	mProductId;	//	b008xxxx	stack+f6c	108
+	uint32*	mVendorId;	//	b008xxxx	stack+f70	112
 	void*	c;	//	b008xxxx	stack+000 null...
 	uint32	thousand;	//	1000 first case, then 0
 	void*	d;	//	b008xxxx
 	int x[100];
 };
+
+//	gr; on stack, is pushed 0x22c/556 bytes
+//		includes vendor(4) product(4) size=512(4)
+//		36 other bytes of data...
+//		open, pread and read are called... maybe an fd somewhere
+//	gr: not sure if we're downloading or uploading...
+//		null probbably ** to buffer
+
+class FirmwareDownloadParams
+{
+public:
+	uint32*	mVendor;	//	0
+	uint32*	mProduct;	//	4
+	uint32*	mNull;		//	8
+	uint32* mDataRead;		//	12
+
+	uint32*	mx700;	//	value is 0x700/1792
+	uint32	mBufferSize;	//	value is 0x200/512
+	uint32*	mNull2;
+	uint8	x[512];
+	uint32*	mDataTotal;
+	uint32*	mValues[3];
+};
+//static_assert(sizeof(FirmwareDownloadParams)==556,"Wrong size struct according to dissaemly");
+
 typedef uint32(*cbCountDevices)(CountDevicesParams);
 typedef int(*cbTryRegisterDevice)(TryRegisterDeviceParams);
+typedef int(*cbFirmwareDownloadCallback)(FirmwareDownloadParams);
 #include <iomanip>
 
 
 //	gr: can't use lambda with a capture variable as a function pointer
 static TSianoLib* gLib = nullptr;
+uint32 SanioVendor = 0x187f;
+uint32 SanioProduct = 0x0202;
 
+class TUsbDeviceIdentifier
+{
+public:
+	TUsbDeviceIdentifier(int Vendor,int Product) :
+		mVendor	( Vendor ),
+		mProduct	( Product )
+	{
+	}
+	uint32	mVendor;
+	uint32	mProduct;
+};
+
+TUsbDeviceIdentifier Devices[] =
+{
+	TUsbDeviceIdentifier( SanioVendor, SanioProduct ),
+	TUsbDeviceIdentifier( SanioProduct, SanioVendor ),
+};
 
 class RegisterUsbStruct
 {
 public:
 	RegisterUsbStruct() :
-		Pad			{ 0,1,2,3,4,5,6,7 },
+		Pad						{ 0,1,2,3 },
+		mFirmwareDownloadCallback	( &DownloadFirmware ),
 		mCountDevicesCallback	( &CountDevices ),
 		mTryRegisterCallback	( &TryRegister ),
 		Data		{ 8,9,10,11,12,13,14,15,16,17,18,19,20,21,22 }
 	{
 	}
+	static int		DownloadFirmware(FirmwareDownloadParams a)
+	{
+		int Size = sizeof(FirmwareDownloadParams);
+		//Soy::Assert( Size==556,"Wrong size struct according to dissaemly");
+
+		std::Debug << "DownloadFirmware()" << std::endl;
+/*
+
+ 0x88d368:  movl   -0x220(%ebp), %eax	int Value = STACKEND-0x220;
+ 0x88d36e:  movl   (%eax), %eax
+ 0x88d370:  cmpl   -0x10(%ebp), %eax	int remain = Value - STACKEND-0x10;
+ 0x88d373:  jne    0x88d37c                  ; SmsAdr_InitFWDownload + 307
+ if ( Remain != 0 )
+ loop
+
+ 0x88d375:  movl   $0xe00002bc, %eax
+ 0x88d37a:  jmp    0x88d35d                  ; SmsAdr_InitFWDownload + 276
+ 0x88d37c:  calll  0x8b2c96                  ; symbol stub for: __stack_chk_fail
+
+*/
+		return 0;	//	unused?
+	}
 	static uint32		CountDevices(CountDevicesParams a)
 	{
 		std::Debug << "CountDevices()" << std::endl;
-		static int DeviceCount = 1;
-		return DeviceCount;
+		return sizeofarray(Devices);
 	}
 	static int		TryRegister(TryRegisterDeviceParams a)
 	{
-		*a.mProductId = 0x0202;
-		*a.mVendorId = 0x187f;
+		*a.mProductId = Devices[a.mDeviceIndex].mProduct;
+		*a.mVendorId = Devices[a.mDeviceIndex].mVendor;
+
 	//	if ( a.thousand != 0 )
 	//		gLib->OnInit();
-		std::Debug << "TryRegister(" << (int)a.mRemainingCalls << ") ";
+		std::Debug << "TryRegister(" << (int)a.mDeviceIndex << ") ";
 		std::Debug << "[c]" << a.c << " ";
 		std::Debug << "[thou]" << a.thousand << " ";
 		std::Debug << "[d]" << a.d << " ";
@@ -466,7 +534,8 @@ public:
 		return ret;
 	}
 	
-	char	Pad[8];
+	char	Pad[4];
+	cbFirmwareDownloadCallback	mFirmwareDownloadCallback;
 	cbCountDevices			mCountDevicesCallback;
 	cbTryRegisterDevice		mTryRegisterCallback;
 	char	Data[100];
