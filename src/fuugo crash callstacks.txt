@@ -1,0 +1,35 @@
+ad 21 Crashed:
+0   libsmsctrllib_lite_1060.dylib 	0x13f4c55c SmsLiteAdrWriteMsg + 20
+1   libsmsctrllib_lite_1060.dylib 	0x13f4a513 SmsLiteSendCtrlMsg + 90
+2   libsmsctrllib_lite_1060.dylib 	0x13f4b62a SmsLiteDvbtAddPidFilter_Req + 67
+3   libdvbtreceiver_siano_lite.0.dylib	0x14601761 _add_section_filter + 257
+4   libaxel_dvb.0.dylib           	0x0fa15e96 _refresh_filters + 150
+5   libaxel_dvb.0.dylib           	0x0fa15f68 _start_si_monitor + 184
+6   libaxel_dvb.0.dylib           	0x0fa17abd _run_action + 1965
+7   libaxel.0.dylib               	0x00711bab lohi_task_run + 203
+8   libaxel.0.dylib               	0x0071624c 0x703000 + 78412
+9   libsystem_pthread.dylib       	0x91476ecf _pthread_body + 138
+10  libsystem_pthread.dylib       	0x91476e45 _pthread_start + 162
+11  libsystem_pthread.dylib       	0x91474f0e thread_start + 34
+
+
+
+
+
+
+
+
+
+Thread 21 Crashed:
+0   libsmsctrllib_lite_1060.dylib 	0x11d15217 SmsAdr_SmsDeviceInitTimerCallBack + 29
+1   com.apple.CoreFoundation      	0x91569b06 __CFRUNLOOP_IS_CALLING_OUT_TO_A_TIMER_CALLBACK_FUNCTION__ + 22
+2   com.apple.CoreFoundation      	0x915695b4 __CFRunLoopDoTimer + 1316
+3   com.apple.CoreFoundation      	0x915e4fff __CFRunLoopDoTimers + 351
+4   com.apple.CoreFoundation      	0x91522121 __CFRunLoopRun + 2081
+5   com.apple.CoreFoundation      	0x91521696 CFRunLoopRunSpecific + 390
+6   com.apple.CoreFoundation      	0x915e4071 CFRunLoopRun + 129
+7   libsmsctrllib_lite_1060.dylib 	0x11d147ad SmsAdr_Task + 537
+8   libsystem_pthread.dylib       	0x91476ecf _pthread_body + 138
+9   libsystem_pthread.dylib       	0x91476e45 _pthread_start + 162
+10  libsystem_pthread.dylib       	0x91474f0e thread_start + 34
+
