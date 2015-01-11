@@ -73,6 +73,8 @@ public:
 										  UINT32						PayloadLen);
 	void	IsdbtUserDataCallback(UINT32 ServiceDevHandle,UINT8* pBuf,UINT32 BufSize);
 
+	 void	OnInit();
+	
 public:
 	bool	mSyncFlag;
 	
@@ -412,10 +414,21 @@ class TryRegisterDeviceParams
 {
 public:
 	uint32	mRemainingCalls;
+	uint32*	mVendorId;	//	b008xxxx	stack+f70	112
+	uint32*	mProductId;	//	b008xxxx	stack+f6c	108
+	void*	c;	//	b008xxxx	stack+000 null...
+	uint32	thousand;	//	1000 first case, then 0
+	void*	d;	//	b008xxxx
 	int x[100];
 };
 typedef uint32(*cbCountDevices)(CountDevicesParams);
 typedef int(*cbTryRegisterDevice)(TryRegisterDeviceParams);
+#include <iomanip>
+
+
+//	gr: can't use lambda with a capture variable as a function pointer
+static TSianoLib* gLib = nullptr;
+
 
 class RegisterUsbStruct
 {
@@ -430,16 +443,26 @@ public:
 	static uint32		CountDevices(CountDevicesParams a)
 	{
 		std::Debug << "CountDevices()" << std::endl;
-		static int CallFuncbXTimes = 100;
-		return CallFuncbXTimes;	//	caller seems to check for non-zero?
+		static int DeviceCount = 1;
+		return DeviceCount;
 	}
 	static int		TryRegister(TryRegisterDeviceParams a)
 	{
+		*a.mProductId = 0x0202;
+		*a.mVendorId = 0x187f;
+	//	if ( a.thousand != 0 )
+	//		gLib->OnInit();
 		std::Debug << "TryRegister(" << (int)a.mRemainingCalls << ") ";
+		std::Debug << "[c]" << a.c << " ";
+		std::Debug << "[thou]" << a.thousand << " ";
+		std::Debug << "[d]" << a.d << " ";
+		std::Debug.setf(std::ios::hex, std::ios::basefield);
 		for ( int i=0;	i<10;	i++ )
-			std::Debug << a.x[i] << " ";
+			std::Debug << a.x[i] << ",";
+		std::Debug.unsetf(std::ios::hex);
 		std::Debug << std::endl;
-		static int ret = 1;
+		static int ret = 0;
+//		std::this_thread::sleep_for( std::chrono::milliseconds(1000) );
 		return ret;
 	}
 	
@@ -451,8 +474,6 @@ public:
 RegisterUsbStruct Dummy;
 
 
-//	gr: can't use lambda with a capture variable as a function pointer
-static TSianoLib* gLib = nullptr;
 auto CallbackWrapper = [](SMSHOSTLIB_MSG_TYPE_RES_E	MsgType,		//!< Response type
 						  SMSHOSTLIB_ERR_CODES_E		ErrCode,		//!< Response success code
 						  UINT8* 						pPayload,		//!< Response payload
@@ -473,6 +494,11 @@ auto DeviceCallbackWrapper = [](void* ClientPtr1, UINT32 handle_num1, UINT8* p_b
 	
 };
 
+auto Crystal = SMSHOSTLIB_DEFAULT_CRYSTAL;
+//	auto Crystal = ISDBT_USER_CRISTAL;
+auto DeviceMode = SMSHOSTLIB_DEVMD_DVBT;
+
+
 TSianoLib::TSianoLib(std::stringstream& Error) :
 	g_bHaveSignalIndicator	( false ),
 	g_bDummyHaveSignal		( false ),
@@ -485,9 +511,6 @@ TSianoLib::TSianoLib(std::stringstream& Error) :
 {
 	gLib = this;
 
-	auto Crystal = SMSHOSTLIB_DEFAULT_CRYSTAL;
-//	auto Crystal = ISDBT_USER_CRISTAL;
-	auto DeviceMode = SMSHOSTLIB_DEVMD_DVBT;
 	
 	//	initialise devices before we can communicate
 	SMSHOSTLIB_ERR_CODES_E Result = SmsAdr_RegisterUSBPersonalitiesAPI(&Dummy);
@@ -512,23 +535,14 @@ TSianoLib::TSianoLib(std::stringstream& Error) :
 	
 	//SmsAdr_SmsDeviceInitTimerCallBack();
 	std::Debug << "hello" << std::endl;
-	
-/*
-	//	open device handle
-	void* Device = nullptr;
-	UINT32 HandleNum = 0;
-	Result = ADR_OpenHandle1( Device, HandleNum, DeviceCallbackWrapper, this );
-	if( Result != SMSHOSTLIB_ERR_OK)
-	{
-		Error << "ADR_OpenHandle1() result: " << Result;
-		return;
-	}
+}
 
-	*/
-	
-/*
+void TSianoLib::OnInit()
+{
+	std::stringstream Error;
+
 	//	get version first
-	
+	if ( false )
 	{
 		UINT16 Len = sizeof(SmsMsgHdr_ST);
 		SmsMsgData_ST SmsMsg = {0};
@@ -550,7 +564,7 @@ TSianoLib::TSianoLib(std::stringstream& Error) :
 		SmsMsg.msgData[0] = DeviceMode;
 		
 		mSyncFlag = false;
-		Result = SmsLiteSendCtrlMsg( (SmsMsgData_ST*)&SmsMsg );
+		auto Result = SmsLiteSendCtrlMsg( (SmsMsgData_ST*)&SmsMsg );
 		
 		// Wait for device init response
 		if ( !SmsHostWaitForFlagSet( &mSyncFlag, 200 ) )
@@ -559,7 +573,7 @@ TSianoLib::TSianoLib(std::stringstream& Error) :
 			return;
 		}
 	}
-	
+/*
 	//	Set crystal message
 	if ( Crystal != SMSHOSTLIB_DEFAULT_CRYSTAL )
 	{
