@@ -414,8 +414,8 @@ class TryRegisterDeviceParams
 {
 public:
 	uint32	mDeviceIndex;
-	uint32*	mProductId;	//	b008xxxx	stack+f6c	108
-	uint32*	mVendorId;	//	b008xxxx	stack+f70	112
+	uint32*	mVendor;	//	b008xxxx	stack+f6c	108
+	uint32*	mProduct;	//	b008xxxx	stack+f70	112
 	void*	c;	//	b008xxxx	stack+000 null...
 	uint32	thousand;	//	1000 first case, then 0
 	void*	d;	//	b008xxxx
@@ -472,7 +472,6 @@ public:
 TUsbDeviceIdentifier Devices[] =
 {
 	TUsbDeviceIdentifier( SanioVendor, SanioProduct ),
-	TUsbDeviceIdentifier( SanioProduct, SanioVendor ),
 };
 
 class RegisterUsbStruct
@@ -515,8 +514,8 @@ public:
 	}
 	static int		TryRegister(TryRegisterDeviceParams a)
 	{
-		*a.mProductId = Devices[a.mDeviceIndex].mProduct;
-		*a.mVendorId = Devices[a.mDeviceIndex].mVendor;
+		*a.mProduct = Devices[a.mDeviceIndex].mProduct;
+		*a.mVendor = Devices[a.mDeviceIndex].mVendor;
 
 	//	if ( a.thousand != 0 )
 	//		gLib->OnInit();
