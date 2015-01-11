@@ -175,40 +175,7 @@ TPopAppError::Type PopMain(TJobParams& Params)
 		CaptureChannel->mOnConnected.AddListener( StartSubscription );
 	}
 	
-	std::string TestFilename = "/users/grahamr/Desktop/ringo.png";
-	
-	//	gr: bootup commands
-	auto BootupGet = [TestFilename](TChannel& Channel)
-	{
-		TJob GetFrameJob;
-		GetFrameJob.mChannelMeta.mChannelRef = Channel.GetChannelRef();
-		GetFrameJob.mParams.mCommand = "getfeature";
-		GetFrameJob.mParams.AddParam("x", 120 );
-		GetFrameJob.mParams.AddParam("y", 120 );
-		GetFrameJob.mParams.AddParam("image", TestFilename, TJobFormat("text/file/png") );
-		Channel.OnJobRecieved( GetFrameJob );
-	};
-	
-	auto BootupMatch = [TestFilename](TChannel& Channel)
-	{
-		TJob GetFrameJob;
-		GetFrameJob.mChannelMeta.mChannelRef = Channel.GetChannelRef();
-		GetFrameJob.mParams.mCommand = "findfeature";
-		GetFrameJob.mParams.AddParam("feature", "01011000000000001100100100000000" );
-		GetFrameJob.mParams.AddParam("image", TestFilename, TJobFormat("text/file/png") );
-		Channel.OnJobRecieved( GetFrameJob );
-	};
-	
-	//	auto BootupFunc = BootupMatch;
-	//auto BootupFunc = BootupGet;
-	auto BootupFunc = BootupMatch;
-	if ( CommandLineChannel->IsConnected() )
-		BootupFunc( *CommandLineChannel );
-	else
-		CommandLineChannel->mOnConnected.AddListener( BootupFunc );
-	
-
-	
+		
 	
 	//	run
 	App.mConsoleApp.WaitForExit();
