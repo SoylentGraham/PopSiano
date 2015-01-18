@@ -439,8 +439,8 @@ public:
 
 	uint32*	mx700;	//	value is 0x700/1792
 	uint32	mBufferSize;	//	value is 0x200/512
-	uint32*	mNull2;
-	uint8	x[512];
+	char	mDummy[4+12];
+	char	mFilenameBuffer[512];
 	uint32*	mDataTotal;
 	uint32*	mValues[3];
 };
@@ -460,18 +460,21 @@ uint32 SanioProduct = 0x0202;
 class TUsbDeviceIdentifier
 {
 public:
-	TUsbDeviceIdentifier(int Vendor,int Product) :
-		mVendor	( Vendor ),
-		mProduct	( Product )
+	TUsbDeviceIdentifier(int Vendor,int Product,const std::string& Filename) :
+		mVendor				( Vendor ),
+		mProduct			( Product ),
+		mFirmwareFilename	( Filename )
 	{
 	}
+	
 	uint32	mVendor;
 	uint32	mProduct;
+	std::string	mFirmwareFilename;
 };
 
 TUsbDeviceIdentifier Devices[] =
 {
-	TUsbDeviceIdentifier( SanioVendor, SanioProduct ),
+	TUsbDeviceIdentifier( SanioVendor, SanioProduct, "firmware/dvb_nova_12mhz_b0.fw" ),
 };
 
 class RegisterUsbStruct
@@ -484,34 +487,38 @@ public:
 		mTryRegisterCallback	( &TryRegister ),
 		Data		{ 8,9,10,11,12,13,14,15,16,17,18,19,20,21,22 }
 	{
+		for ( int d=0;	d<sizeofarray(Data);	d++ )
+			Data[d] = d % 256;
 	}
+	
 	static int		DownloadFirmware(FirmwareDownloadParams a)
 	{
-		int Size = sizeof(FirmwareDownloadParams);
-		//Soy::Assert( Size==556,"Wrong size struct according to dissaemly");
+		TUsbDeviceIdentifier* Device = nullptr;
+		for ( int d=0;	d<sizeofarray(Devices);	d++ )
+		{
+			auto& Dev = Devices[d];
+			if ( Dev.mProduct != *a.mProduct )
+				continue;
+			if ( Dev.mProduct != *a.mVendor )
+				continue;
+			Device = &Dev;
+		}
+		if ( !Device )
+			return false;
+		
+		//	get filename into buffer for caller
+		std::Debug << "Sending firmware filename; " << Device->mFirmwareFilename << std::endl;
+		strcpy( a.mFilenameBuffer, Device->mFirmwareFilename.c_str() );
 
-		std::Debug << "DownloadFirmware()" << std::endl;
-/*
-
- 0x88d368:  movl   -0x220(%ebp), %eax	int Value = STACKEND-0x220;
- 0x88d36e:  movl   (%eax), %eax
- 0x88d370:  cmpl   -0x10(%ebp), %eax	int remain = Value - STACKEND-0x10;
- 0x88d373:  jne    0x88d37c                  ; SmsAdr_InitFWDownload + 307
- if ( Remain != 0 )
- loop
-
- 0x88d375:  movl   $0xe00002bc, %eax
- 0x88d37a:  jmp    0x88d35d                  ; SmsAdr_InitFWDownload + 276
- 0x88d37c:  calll  0x8b2c96                  ; symbol stub for: __stack_chk_fail
-
-*/
-		return 0;	//	unused?
+		return true;
 	}
+	
 	static uint32		CountDevices(CountDevicesParams a)
 	{
 		std::Debug << "CountDevices()" << std::endl;
 		return sizeofarray(Devices);
 	}
+	
 	static int		TryRegister(TryRegisterDeviceParams a)
 	{
 		*a.mProduct = Devices[a.mDeviceIndex].mProduct;
@@ -906,8 +913,9 @@ bool SianoContainer::Iteration()
 	return true;
 }
 
-std::shared_ptr<TVideoDevice> SianoContainer::AllocDevice(const std::string& Serial,std::stringstream& Error)
+std::shared_ptr<TVideoDevice> SianoContainer::AllocDevice(const TVideoDeviceMeta& Meta,std::stringstream& Error)
 {
+	//	gr: double check meta?
 	return mDevice;
 }
 

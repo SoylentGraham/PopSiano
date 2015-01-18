@@ -37,7 +37,7 @@ public:
 	virtual ~SianoContainer();
 	
 	virtual void							GetDevices(ArrayBridge<TVideoDeviceMeta>& Metas) override;
-	virtual std::shared_ptr<TVideoDevice>	AllocDevice(const std::string& Serial,std::stringstream& Error) override;
+	virtual std::shared_ptr<TVideoDevice>	AllocDevice(const TVideoDeviceMeta& Meta,std::stringstream& Error) override;
 	
 private:
 	virtual bool		Iteration();
