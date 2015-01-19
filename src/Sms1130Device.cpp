@@ -432,8 +432,8 @@ public:
 class FirmwareDownloadParams
 {
 public:
-	uint32*	mVendor;	//	0
-	uint32*	mProduct;	//	4
+	uint32	mVendor;	//	0
+	uint32	mProduct;	//	4
 	uint32*	mNull;		//	8
 	uint32* mDataRead;		//	12
 
@@ -497,9 +497,9 @@ public:
 		for ( int d=0;	d<sizeofarray(Devices);	d++ )
 		{
 			auto& Dev = Devices[d];
-			if ( Dev.mProduct != *a.mProduct )
+			if ( Dev.mProduct != a.mProduct )
 				continue;
-			if ( Dev.mProduct != *a.mVendor )
+			if ( Dev.mVendor != a.mVendor )
 				continue;
 			Device = &Dev;
 		}
