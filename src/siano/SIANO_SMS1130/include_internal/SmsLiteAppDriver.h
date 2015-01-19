@@ -32,7 +32,7 @@
 extern "C" {
 #endif
 
-#include "Include/sms_common.h"
+//#include "Include/sms_common.h"
 
 #define	ADR_CTRL_HANDLE		0
 
@@ -77,10 +77,11 @@ typedef void ( *SmsLiteAdr_pfnFuncCb )( UINT32 handle_num, UINT8* p_buffer, UINT
 
 	\return		#SMSHOSTLIB_ERR_CODES_E	Return code.
 */
+	/*
 SMSHOSTLIB_ERR_CODES_E SmsLiteAdrInit( SMSHOSTLIB_DEVICE_MODES_E DeviceMode, 
 									  SmsLiteAdr_pfnFuncCb pfnControlCb, 
 									  SmsLiteAdr_pfnFuncCb pfnDataCb );
-
+*/
 //									  void * pfnControlCb, 
 //									  void * pfnDataCb );
 

@@ -61,7 +61,7 @@ typedef struct _QUALITY_CALC_ENTRY
 
 
 //	real worker
-class TSianoLib
+class TSianoLib : public SoyWorkerThread
 {
 public:
 	TSianoLib(std::stringstream& Error);
@@ -74,6 +74,8 @@ public:
 	void	IsdbtUserDataCallback(UINT32 ServiceDevHandle,UINT8* pBuf,UINT32 BufSize);
 
 	 void	OnInit();
+
+	virtual bool		Iteration() override;
 	
 public:
 	bool	mSyncFlag;
@@ -89,6 +91,8 @@ public:
 	char g_SignalQuality;
 	
 	Array<Array<uint8>>	mDataCallbacks;
+
+	ofMutexM<bool>	mDoInit;
 };
 
 LONG ReceptionQualityVal2Grade( PQUALITY_CALC_ENTRY Table, LONG Val )
@@ -223,10 +227,10 @@ void SmsLiteMsControlRxCallback(  UINT32 handle_num, UINT8* p_buffer, UINT32 buf
 	UINT32 PayloadLengthWoRetCode = 0;
 	SMSHOSTLIB_ERR_CODES_E RetCodeFromMsg = SMSHOSTLIB_ERR_UNDEFINED_ERR;
 	
-	SMS_ASSERT( handle_num == 0 );
-	SMS_ASSERT( p_buffer != NULL );
-	SMS_ASSERT( buff_size != 0 );
-	SMS_ASSERT( buff_size >= pSmsMsg->xMsgHeader.msgLength );
+//	Soy::Assert( handle_num == 0 );
+//	SMS_ASSERT( p_buffer != NULL );
+//	SMS_ASSERT( buff_size != 0 );
+	if ( !Soy::Assert( buff_size >= pSmsMsg->xMsgHeader.msgLength );
 	SMS_ASSERT( pSmsMsg->xMsgHeader.msgLength >= sizeof( SmsMsgHdr_ST ) );
 	
 	pPayload = (UINT8*)&pSmsMsg->msgData[0];
@@ -394,12 +398,6 @@ void SmsLiteMsControlRxCallback(  UINT32 handle_num, UINT8* p_buffer, UINT32 buf
 	*/
 }
 
-extern "C"
-{
-	SMSHOSTLIB_ERR_CODES_E SmsAdr_RegisterUSBPersonalitiesAPI(void*);
-	//void SmsAdr_SmsDeviceInitTimerCallBack(void);
-};
-
 void FunctionTest()
 {
 	std::Debug << "called" <<std::endl;
@@ -487,6 +485,7 @@ public:
 		mTryRegisterCallback	( &TryRegister ),
 		Data		{ 8,9,10,11,12,13,14,15,16,17,18,19,20,21,22 }
 	{
+		std::Debug << "this(RegisterUsbStruct*): " << this << std::endl;
 		for ( int d=0;	d<sizeofarray(Data);	d++ )
 			Data[d] = d % 256;
 	}
@@ -510,6 +509,8 @@ public:
 		std::Debug << "Sending firmware filename; " << Device->mFirmwareFilename << std::endl;
 		strcpy( a.mFilenameBuffer, Device->mFirmwareFilename.c_str() );
 
+		std::Debug << "stack addr: " << (void*)(&a) << std::endl;
+		
 		return true;
 	}
 	
@@ -524,8 +525,6 @@ public:
 		*a.mProduct = Devices[a.mDeviceIndex].mProduct;
 		*a.mVendor = Devices[a.mDeviceIndex].mVendor;
 
-	//	if ( a.thousand != 0 )
-	//		gLib->OnInit();
 		std::Debug << "TryRegister(" << (int)a.mDeviceIndex << ") ";
 		std::Debug << "[c]" << a.c << " ";
 		std::Debug << "[thou]" << a.thousand << " ";
@@ -546,7 +545,6 @@ public:
 	cbTryRegisterDevice		mTryRegisterCallback;
 	char	Data[100];
 };
-RegisterUsbStruct Dummy;
 
 
 auto CallbackWrapper = [](SMSHOSTLIB_MSG_TYPE_RES_E	MsgType,		//!< Response type
@@ -568,6 +566,57 @@ auto DeviceCallbackWrapper = [](void* ClientPtr1, UINT32 handle_num1, UINT8* p_b
 	//		typedef void ( *ADR_pfnFuncCb1 )(  void* ClientPtr1, UINT32 handle_num1, UINT8* p_buffer1, UINT32 buff_size1, UINT32 xx );
 	
 };
+		
+		
+
+class OnDeviceChangedParams
+{
+public:
+	uint32	mAdded;				//	0x1, 0 on removed...
+	
+	uint32	mSomething;				//	<something> on added, 2 on removed
+	uint32*	mPointerToPointer;		//	null on removed
+	uint32* mPointerToSomething;	//	content null on removed
+	uint32*	Params[10];	//
+};
+
+typedef int ( *SmsLiteAdr_DeviceChangedCb )(OnDeviceChangedParams);
+
+extern "C"
+{
+	SMSHOSTLIB_ERR_CODES_E SmsAdr_RegisterUSBPersonalitiesAPI(void*);
+	//void SmsAdr_SmsDeviceInitTimerCallBack(void);
+	
+	SMSHOSTLIB_ERR_CODES_E SmsLiteAdrInit( SMSHOSTLIB_DEVICE_MODES_E DeviceMode,
+										  SmsLiteAdr_pfnFuncCb pfnControlCb,
+										  SmsLiteAdr_pfnFuncCb pfnDataCb,
+										  SmsLiteAdr_DeviceChangedCb OnDeviceChangedFuncCb,
+										  uint32 Param3,
+										  uint32 Param4,
+										  uint32 Param5
+										  );
+	
+	
+};
+
+
+auto OnDeviceChanged = [](OnDeviceChangedParams a)
+{
+	std::Debug << "Device changed: " << std::endl;
+	std::Debug << "Added device: " << a.mAdded << std::endl;
+	std::Debug << "something: " << a.mSomething << std::endl;
+	
+	if ( a.mAdded )
+	{
+		gLib->mDoInit.lock();
+		gLib->mDoInit.mMember = true;
+		gLib->mDoInit.unlock();
+	}
+	//	gr: reutrning 0 hung on close()...
+	//	gr: -1 continued and did some IO stuff...
+	static int Return = -1;
+	return Return;
+};
 
 auto Crystal = SMSHOSTLIB_DEFAULT_CRYSTAL;
 //	auto Crystal = ISDBT_USER_CRISTAL;
@@ -575,6 +624,7 @@ auto DeviceMode = SMSHOSTLIB_DEVMD_DVBT;
 
 
 TSianoLib::TSianoLib(std::stringstream& Error) :
+	SoyWorkerThread			( "SianoLib", SoyWorkerWaitMode::Sleep ),
 	g_bHaveSignalIndicator	( false ),
 	g_bDummyHaveSignal		( false ),
 	g_SignalStrength		( 0 ),
@@ -585,6 +635,7 @@ TSianoLib::TSianoLib(std::stringstream& Error) :
 	g_SignalQuality			( 0 )
 {
 	gLib = this;
+	static RegisterUsbStruct Dummy;
 
 	
 	//	initialise devices before we can communicate
@@ -598,9 +649,15 @@ TSianoLib::TSianoLib(std::stringstream& Error) :
 		return;
 	}
 	
+	//	note: this tried to call 12121200 so 3rd param maybe different
+	uint32 Param3 = 0x34343434;
+	uint32 Param4 = 0x56565656;
+	uint32 Param5 = 0x78787878;
 	Result = SmsLiteAdrInit( DeviceMode,
 							 SmsLiteMsControlRxCallback,
-							 DataCallbackWrapper );
+							 DataCallbackWrapper,
+							 OnDeviceChanged, Param3, Param4, Param5
+							);
 	if( Result != SMSHOSTLIB_ERR_OK)
 	{
 		Error << "SmsLiteMsLibInit() result: " << Result;
@@ -610,6 +667,28 @@ TSianoLib::TSianoLib(std::stringstream& Error) :
 	
 	//SmsAdr_SmsDeviceInitTimerCallBack();
 	std::Debug << "hello" << std::endl;
+	
+	Start();
+}
+		
+bool TSianoLib::Iteration()
+{
+	bool DoInit = false;
+	mDoInit.lock();
+	if ( mDoInit.mMember )
+	{
+		DoInit = true;
+		mDoInit.mMember = false;
+	}
+	mDoInit.unlock();
+	
+	if ( DoInit )
+	{
+		std::this_thread::sleep_for( std::chrono::milliseconds(6000) );
+		OnInit();
+	}
+
+	return true;
 }
 
 void TSianoLib::OnInit()
@@ -617,7 +696,7 @@ void TSianoLib::OnInit()
 	std::stringstream Error;
 
 	//	get version first
-	if ( false )
+	if ( true )
 	{
 		UINT16 Len = sizeof(SmsMsgHdr_ST);
 		SmsMsgData_ST SmsMsg = {0};
