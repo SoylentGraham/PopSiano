@@ -215,10 +215,9 @@ SMSHOSTLIB_ERR_CODES_E SmsLiteMsLibInit( SMSHOSTLIBLITE_MS_INITLIB_PARAMS_ST* pI
 
 void SmsLiteMsControlRxCallback(  UINT32 handle_num, UINT8* p_buffer, UINT32 buff_size )
 {
-	/*
 	SmsMsgData_ST* pSmsMsg = (SmsMsgData_ST*)p_buffer;
 	SMSHOSTLIB_ERR_CODES_E RetCode = SMSHOSTLIB_ERR_UNDEFINED_ERR;
-	UINT32 ResponseMsgType = SMSHOSTLIB_MSG_INVALID_RESPONSE_VAL;
+	SMSHOSTLIB_MSG_TYPE_RES_E ResponseMsgType = SMSHOSTLIB_MSG_INVALID_RESPONSE_VAL;
 	UINT8* pPayload = NULL;
 	UINT32 PayloadLength = 0;
 	
@@ -227,50 +226,54 @@ void SmsLiteMsControlRxCallback(  UINT32 handle_num, UINT8* p_buffer, UINT32 buf
 	UINT32 PayloadLengthWoRetCode = 0;
 	SMSHOSTLIB_ERR_CODES_E RetCodeFromMsg = SMSHOSTLIB_ERR_UNDEFINED_ERR;
 	
-//	Soy::Assert( handle_num == 0 );
-//	SMS_ASSERT( p_buffer != NULL );
-//	SMS_ASSERT( buff_size != 0 );
-	if ( !Soy::Assert( buff_size >= pSmsMsg->xMsgHeader.msgLength );
-	SMS_ASSERT( pSmsMsg->xMsgHeader.msgLength >= sizeof( SmsMsgHdr_ST ) );
+	if ( !Soy::Assert( handle_num == 0, "expecting only 0 handle" ) )
+		return;
+	if ( !Soy::Assert( p_buffer != nullptr && buff_size > 0, "invalid buffer spec" ) )
+		return;
+	if ( !Soy::Assert( buff_size >= pSmsMsg->xMsgHeader.msgLength, "Buffer too small for described message length" ) )
+		return;
+	if ( !Soy::Assert( pSmsMsg->xMsgHeader.msgLength >= sizeof( SmsMsgHdr_ST ), "Message header larger than expected" ) )
+		return;
 	
 	pPayload = (UINT8*)&pSmsMsg->msgData[0];
 	PayloadLength = pSmsMsg->xMsgHeader.msgLength - sizeof( SmsMsgHdr_ST );
 	
 	if ( PayloadLength >= 4 )
 	{
-		
-		RetCodeFromMsg = pSmsMsg->msgData[0];
+		RetCodeFromMsg = static_cast<SMSHOSTLIB_ERR_CODES_E>(pSmsMsg->msgData[0]);
 		pPayloadWoRetCode = pPayload + 4;
 		PayloadLengthWoRetCode = PayloadLength - 4;
 	}
 	
-	SMSHOST_LOG3( SMSLOG_ERROR, "Control callback. Type %d, Retcode %#x, Payload Length %d",
-				 pSmsMsg->xMsgHeader.msgType,
-				 RetCode,
-				 PayloadLength );
+	auto MsgType = static_cast<MsgTypes_E>(pSmsMsg->xMsgHeader.msgType);
+	std::Debug << "Control callback. Type " << pSmsMsg->xMsgHeader.msgType << ", Retcode " << RetCode << ", Payload Length " << PayloadLength << std::endl;
 	
-	switch( pSmsMsg->xMsgHeader.msgType )
+	switch( MsgType )
 	{
 		case MSG_SMS_NEW_CRYSTAL_RES:
-		case MSG_SMS_INIT_DEVICE_RES:
-		{
-			g_LibMsState.SyncFlag = TRUE;
-		}
+			//g_LibMsState.SyncFlag = TRUE;
+			std::Debug << "new crystal" << std::endl;
 			break;
+			
+		case MSG_SMS_INIT_DEVICE_RES:
+			std::Debug << "init device res" << std::endl;
+			break;
+
 		case MSG_SMS_TRANSMISSION_IND:
 		{
 			// Update the DVBT statistics. No need for a response to the app.
+			static TRANSMISSION_STATISTICS_ST Stats;
 			
-			memcpy(	&g_LibMsState.DvbtStatsCache.TransmissionData,
-				   (TRANSMISSION_STATISTICS_ST*)pSmsMsg->msgData,
-				   sizeof( g_LibMsState.DvbtStatsCache.TransmissionData ));
-			g_LibMsState.DvbtStatsCache.ReceptionData.IsDemodLocked = 0;
+			memcpy(	&Stats, pSmsMsg->msgData, sizeof(Stats) );
+			//g_LibMsState.DvbtStatsCache.ReceptionData.IsDemodLocked = 0;
 			
 			//no need to correct guard interval (as opposed to old statistics message).
-			CORRECT_STAT_BANDWIDTH(g_LibMsState.DvbtStatsCache.TransmissionData);
-			CORRECT_STAT_TRANSMISSON_MODE(g_LibMsState.DvbtStatsCache.TransmissionData);
+			//CORRECT_STAT_BANDWIDTH(g_LibMsState.DvbtStatsCache.TransmissionData);
+			//CORRECT_STAT_TRANSMISSON_MODE(g_LibMsState.DvbtStatsCache.TransmissionData);
 		}
-			break;
+		break;
+			
+			/*
 		case MSG_SMS_HO_PER_SLICES_IND:
 		{
 			// Update the DVBT statistics. No need for a response to the app.
@@ -384,7 +387,7 @@ void SmsLiteMsControlRxCallback(  UINT32 handle_num, UINT8* p_buffer, UINT32 buf
 			RetCode = RetCodeFromMsg;
 		}
 			break;
-			
+		*/
 		default:
 			SmsLiteCommonControlRxHandler( handle_num, p_buffer, buff_size );
 			break;
@@ -393,9 +396,9 @@ void SmsLiteMsControlRxCallback(  UINT32 handle_num, UINT8* p_buffer, UINT32 buf
 	// Call the user callback
 	if ( ResponseMsgType != SMSHOSTLIB_MSG_INVALID_RESPONSE_VAL )
 	{
-		SmsLiteCallCtrlCallback( ResponseMsgType, RetCode, pPayload, PayloadLength );
+	//	SmsLiteCallCtrlCallback( ResponseMsgType, RetCode, pPayload, PayloadLength );
 	}
-	*/
+	
 }
 
 void FunctionTest()
@@ -698,14 +701,13 @@ void TSianoLib::OnInit()
 	//	get version first
 	if ( true )
 	{
-		UINT16 Len = sizeof(SmsMsgHdr_ST);
 		SmsMsgData_ST SmsMsg = {0};
 		SMS_SET_HOST_DEVICE_STATIC_MSG_FIELDS( &SmsMsg );
 		SmsMsg.xMsgHeader.msgSrcId = SMS_HOST_LIB_INTERNAL;
 		SmsMsg.xMsgHeader.msgDstId = HIF_TASK;
 		SmsMsg.xMsgHeader.msgFlags = 0;
 		SmsMsg.xMsgHeader.msgType  = MSG_SMS_GET_VERSION_EX_REQ;
-		SmsMsg.xMsgHeader.msgLength = Len;
+		SmsMsg.xMsgHeader.msgLength = sizeof(SmsMsg);
 		SmsLiteAdrWriteMsg( &SmsMsg );
 	}
 	
@@ -714,8 +716,11 @@ void TSianoLib::OnInit()
 		SmsMsgData3Args_ST SmsMsg = {0};
 		SMS_SET_HOST_DEVICE_STATIC_MSG_FIELDS( &SmsMsg );
 		SmsMsg.xMsgHeader.msgType  = MSG_SMS_INIT_DEVICE_REQ;
-		SmsMsg.xMsgHeader.msgLength =
+		SmsMsg.xMsgHeader.msgLength = sizeof(SmsMsg);
 		SmsMsg.msgData[0] = DeviceMode;
+		
+		SmsLiteAdrWriteMsg( (SmsMsgData_ST*)&SmsMsg );
+		/*
 		
 		mSyncFlag = false;
 		auto Result = SmsLiteSendCtrlMsg( (SmsMsgData_ST*)&SmsMsg );
@@ -726,6 +731,7 @@ void TSianoLib::OnInit()
 			Error << "failed to init sms device";
 			return;
 		}
+		 */
 	}
 /*
 	//	Set crystal message
