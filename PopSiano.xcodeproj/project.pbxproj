@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FB50C2561A6C62A30011A9D9 /* dvb_nova_12mhz_b0.fw in CopyFiles */ = {isa = PBXBuildFile; fileRef = FB50C2531A6C62270011A9D9 /* dvb_nova_12mhz_b0.fw */; };
 		FB5702CE1A6199CA00449FF3 /* TChannelLiteral.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FB5702CC1A6199CA00449FF3 /* TChannelLiteral.cpp */; };
 		FB5702D51A61A19800449FF3 /* Sms1130Device.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FB5702D31A61A19800449FF3 /* Sms1130Device.cpp */; };
 		FB5702D81A61A50500449FF3 /* SoyVideoDevice.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FB5702D61A61A50500449FF3 /* SoyVideoDevice.cpp */; };
@@ -72,6 +73,16 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		FB50C2551A6C62950011A9D9 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = firmware;
+			dstSubfolderSpec = 16;
+			files = (
+				FB50C2561A6C62A30011A9D9 /* dvb_nova_12mhz_b0.fw in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		FB8A05911A2E54730099596C /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 12;
@@ -85,6 +96,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		FB50C2531A6C62270011A9D9 /* dvb_nova_12mhz_b0.fw */ = {isa = PBXFileReference; lastKnownFileType = file; path = dvb_nova_12mhz_b0.fw; sourceTree = "<group>"; };
 		FB5702CB1A5FDC9700449FF3 /* stb_image.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = stb_image.h; path = src/stb/stb_image.h; sourceTree = "<group>"; };
 		FB5702CC1A6199CA00449FF3 /* TChannelLiteral.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = TChannelLiteral.cpp; path = src/TChannelLiteral.cpp; sourceTree = "<group>"; };
 		FB5702CD1A6199CA00449FF3 /* TChannelLiteral.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TChannelLiteral.h; path = src/TChannelLiteral.h; sourceTree = "<group>"; };
@@ -236,6 +248,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		FB50C2521A6C62270011A9D9 /* firmware */ = {
+			isa = PBXGroup;
+			children = (
+				FB50C2531A6C62270011A9D9 /* dvb_nova_12mhz_b0.fw */,
+			);
+			path = firmware;
+			sourceTree = SOURCE_ROOT;
+		};
 		FB5702CA1A5FDC8800449FF3 /* stb */ = {
 			isa = PBXGroup;
 			children = (
@@ -297,6 +317,7 @@
 				FB5702D41A61A19800449FF3 /* Sms1130Device.h */,
 				FB8A07181A2E6C3E0099596C /* PopSanio.cpp */,
 				FB8A07191A2E6C3E0099596C /* PopSanio.h */,
+				FB50C2521A6C62270011A9D9 /* firmware */,
 			);
 			path = src;
 			sourceTree = SOURCE_ROOT;
@@ -470,6 +491,7 @@
 				FB8A058F1A2E54730099596C /* Sources */,
 				FB8A05901A2E54730099596C /* Frameworks */,
 				FB8A05911A2E54730099596C /* CopyFiles */,
+				FB50C2551A6C62950011A9D9 /* CopyFiles */,
 			);
 			buildRules = (
 			);
