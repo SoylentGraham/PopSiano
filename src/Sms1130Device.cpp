@@ -5,6 +5,8 @@
 #include "TParameters.h"
 #include "TChannel.h"
 
+
+				
 typedef uint32 UINT32;
 typedef uint16 UINT16;
 typedef uint8 UINT8;
@@ -21,6 +23,22 @@ typedef bool BOOL;
 
 //#define SMS_PLAT_DEFS_H
 #include "siano/SIANO_SMS1130/include_internal/SmsLiteAppDriver.h"
+
+
+namespace SmsMsgTypes
+{
+	typedef MsgTypes_E Type;
+	
+	DECLARE_SOYENUM_WITHINVALID(SmsMsgTypes,MSG_TYPE_BASE_VAL);
+};
+
+#define DEFINE_SOYENUM(Value)	{	Value, "x"	}
+
+std::map<SmsMsgTypes::Type,std::string> SmsMsgTypes::EnumMap =
+{
+	DEFINE_SOYENUM( MSG_SMS_GET_VERSION_REQ )
+};
+
 
 typedef struct IsdbtUserStats_S
 {
@@ -218,8 +236,8 @@ void SmsLiteMsControlRxCallback(  UINT32 handle_num, UINT8* p_buffer, UINT32 buf
 	SmsMsgData_ST* pSmsMsg = (SmsMsgData_ST*)p_buffer;
 	SMSHOSTLIB_ERR_CODES_E RetCode = SMSHOSTLIB_ERR_UNDEFINED_ERR;
 	SMSHOSTLIB_MSG_TYPE_RES_E ResponseMsgType = SMSHOSTLIB_MSG_INVALID_RESPONSE_VAL;
-	UINT8* pPayload = NULL;
-	UINT32 PayloadLength = 0;
+	UINT8* pPayload = (UINT8*)&pSmsMsg->msgData[0];
+	UINT32 PayloadLength = pSmsMsg->xMsgHeader.msgLength - sizeof( SmsMsgHdr_ST );
 	
 	// Return code and payload for the messages which have retcode as the first 4 bytes
 	UINT8* pPayloadWoRetCode = NULL;
@@ -235,9 +253,6 @@ void SmsLiteMsControlRxCallback(  UINT32 handle_num, UINT8* p_buffer, UINT32 buf
 	if ( !Soy::Assert( pSmsMsg->xMsgHeader.msgLength >= sizeof( SmsMsgHdr_ST ), "Message header larger than expected" ) )
 		return;
 	
-	pPayload = (UINT8*)&pSmsMsg->msgData[0];
-	PayloadLength = pSmsMsg->xMsgHeader.msgLength - sizeof( SmsMsgHdr_ST );
-	
 	if ( PayloadLength >= 4 )
 	{
 		RetCodeFromMsg = static_cast<SMSHOSTLIB_ERR_CODES_E>(pSmsMsg->msgData[0]);
@@ -246,7 +261,7 @@ void SmsLiteMsControlRxCallback(  UINT32 handle_num, UINT8* p_buffer, UINT32 buf
 	}
 	
 	auto MsgType = static_cast<MsgTypes_E>(pSmsMsg->xMsgHeader.msgType);
-	std::Debug << "Control callback. Type " << pSmsMsg->xMsgHeader.msgType << ", Retcode " << RetCode << ", Payload Length " << PayloadLength << std::endl;
+	std::Debug << "Control callback. Type " << MsgType << ", Retcode " << RetCode << ", Payload Length " << PayloadLength << std::endl;
 	
 	switch( MsgType )
 	{
@@ -273,25 +288,24 @@ void SmsLiteMsControlRxCallback(  UINT32 handle_num, UINT8* p_buffer, UINT32 buf
 		}
 		break;
 			
-			/*
+			
 		case MSG_SMS_HO_PER_SLICES_IND:
 		{
 			// Update the DVBT statistics. No need for a response to the app.
-			SmsHandlePerSlicesIndication(pSmsMsg);
+			//SmsHandlePerSlicesIndication(pSmsMsg);
 		}
-			break;
+		break;
+			
 		case MSG_SMS_SIGNAL_DETECTED_IND:
-		{
 			ResponseMsgType = SMSHOSTLIB_MSG_SMS_SIGNAL_DETECTED_IND;
 			RetCode = SMSHOSTLIB_ERR_OK;
-		}
 			break;
+
 		case MSG_SMS_NO_SIGNAL_IND:
-		{
 			ResponseMsgType = SMSHOSTLIB_MSG_SMS_NO_SIGNAL_IND;
 			RetCode = SMSHOSTLIB_ERR_OK;
-		}
 			break;
+
 		case MSG_SMS_ADD_PID_FILTER_RES:
 		{
 			ResponseMsgType = SMSHOSTLIB_MSG_ADD_PID_FILTER_RES;
@@ -387,7 +401,7 @@ void SmsLiteMsControlRxCallback(  UINT32 handle_num, UINT8* p_buffer, UINT32 buf
 			RetCode = RetCodeFromMsg;
 		}
 			break;
-		*/
+		
 		default:
 			SmsLiteCommonControlRxHandler( handle_num, p_buffer, buff_size );
 			break;
@@ -396,7 +410,7 @@ void SmsLiteMsControlRxCallback(  UINT32 handle_num, UINT8* p_buffer, UINT32 buf
 	// Call the user callback
 	if ( ResponseMsgType != SMSHOSTLIB_MSG_INVALID_RESPONSE_VAL )
 	{
-	//	SmsLiteCallCtrlCallback( ResponseMsgType, RetCode, pPayload, PayloadLength );
+		SmsLiteCallCtrlCallback( ResponseMsgType, RetCode, pPayload, PayloadLength );
 	}
 	
 }
