@@ -32,12 +32,37 @@ namespace SmsMsgTypes
 	DECLARE_SOYENUM_WITHINVALID(SmsMsgTypes,MSG_TYPE_BASE_VAL);
 };
 
-#define DEFINE_SOYENUM(Value)	{	Value, "x"	}
+#define DEFINE_SOYENUM(Value)	{	Value, #Value	}
 
 std::map<SmsMsgTypes::Type,std::string> SmsMsgTypes::EnumMap =
 {
-	DEFINE_SOYENUM( MSG_SMS_GET_VERSION_REQ )
+	DEFINE_SOYENUM( MSG_SMS_GET_VERSION_EX_REQ ),
+	DEFINE_SOYENUM( MSG_SMS_GET_VERSION_EX_RES ),
+	DEFINE_SOYENUM( MSG_SMS_GET_VERSION_REQ ),
+	DEFINE_SOYENUM( MSG_SMS_TRANSMISSION_IND ),
+	DEFINE_SOYENUM( MSG_SMS_PID_STATISTICS_IND ),
+	DEFINE_SOYENUM( MSG_SMS_POWER_DOWN_IND ),
+	DEFINE_SOYENUM( MSG_SMS_POWER_DOWN_CONF ),
+	DEFINE_SOYENUM( MSG_SMS_POWER_UP_IND ),
+	DEFINE_SOYENUM( MSG_SMS_POWER_UP_CONF ),
+	DEFINE_SOYENUM( MSG_SMS_CMMB_GET_CHANNELS_INFO_REQ ),
+	DEFINE_SOYENUM( MSG_SMS_CMMB_GET_CHANNELS_INFO_RES ),
+	
 };
+
+std::ostream& operator<< ( std::ostream &out, const MsgTypes_E &in )
+{
+	out << SmsMsgTypes::ToString(in);
+	return out;
+}
+
+std::ostream& operator<< ( std::ostream &out, const SMSHOSTLIB_ERR_CODES_E &in )
+{
+	out.setf(std::ios::hex, std::ios::basefield);
+	out << in;
+	out.unsetf(std::ios::hex);
+	return out;
+}
 
 
 typedef struct IsdbtUserStats_S
@@ -96,7 +121,7 @@ public:
 	virtual bool		Iteration() override;
 	
 public:
-	bool	mSyncFlag;
+	SoyEvent<bool>		mOnDeviceInitialised;
 	
 	IsdbtState_ST g_IsdbtState;
 	bool g_bHaveSignalIndicator;
@@ -231,37 +256,45 @@ SMSHOSTLIB_ERR_CODES_E SmsLiteMsLibInit( SMSHOSTLIBLITE_MS_INITLIB_PARAMS_ST* pI
 }
  */
 
+
+template<class ARRAY>
+void Redirect_SmsLiteCallCtrlCallback(SMSHOSTLIB_MSG_TYPE_RES_E ResponseMsgType,SMSHOSTLIB_ERR_CODES_E RetCode,ARRAY& Payload)
+{
+	SmsLiteCallCtrlCallback( ResponseMsgType, RetCode, Payload.GetArray(), Payload.GetDataSize() );
+}
+
+
 void SmsLiteMsControlRxCallback(  UINT32 handle_num, UINT8* p_buffer, UINT32 buff_size )
 {
-	SmsMsgData_ST* pSmsMsg = (SmsMsgData_ST*)p_buffer;
-	SMSHOSTLIB_ERR_CODES_E RetCode = SMSHOSTLIB_ERR_UNDEFINED_ERR;
-	SMSHOSTLIB_MSG_TYPE_RES_E ResponseMsgType = SMSHOSTLIB_MSG_INVALID_RESPONSE_VAL;
-	UINT8* pPayload = (UINT8*)&pSmsMsg->msgData[0];
-	UINT32 PayloadLength = pSmsMsg->xMsgHeader.msgLength - sizeof( SmsMsgHdr_ST );
-	
-	// Return code and payload for the messages which have retcode as the first 4 bytes
-	UINT8* pPayloadWoRetCode = NULL;
-	UINT32 PayloadLengthWoRetCode = 0;
-	SMSHOSTLIB_ERR_CODES_E RetCodeFromMsg = SMSHOSTLIB_ERR_UNDEFINED_ERR;
-	
-	if ( !Soy::Assert( handle_num == 0, "expecting only 0 handle" ) )
-		return;
 	if ( !Soy::Assert( p_buffer != nullptr && buff_size > 0, "invalid buffer spec" ) )
+		return;
+
+	SmsMsgData_ST* pSmsMsg = reinterpret_cast<SmsMsgData_ST*>(p_buffer);
+	if ( !Soy::Assert( handle_num == 0, "expecting only 0 handle" ) )
 		return;
 	if ( !Soy::Assert( buff_size >= pSmsMsg->xMsgHeader.msgLength, "Buffer too small for described message length" ) )
 		return;
 	if ( !Soy::Assert( pSmsMsg->xMsgHeader.msgLength >= sizeof( SmsMsgHdr_ST ), "Message header larger than expected" ) )
 		return;
+
+	auto* pPayload = reinterpret_cast<const char*>(&pSmsMsg->msgData[0]);
+	int PayloadLength = pSmsMsg->xMsgHeader.msgLength - sizeof( SmsMsgHdr_ST );
+	auto Payload = GetRemoteArray( pPayload, PayloadLength, PayloadLength );
 	
+	//	Return code and payload for the messages which have retcode as the first 4 bytes
+	SMSHOSTLIB_ERR_CODES_E RetCodeFromMsg = SMSHOSTLIB_ERR_UNDEFINED_ERR;
 	if ( PayloadLength >= 4 )
 	{
 		RetCodeFromMsg = static_cast<SMSHOSTLIB_ERR_CODES_E>(pSmsMsg->msgData[0]);
-		pPayloadWoRetCode = pPayload + 4;
-		PayloadLengthWoRetCode = PayloadLength - 4;
 	}
+	int PayloadLengthWoRetCode = PayloadLength-4;
+	auto PayloadWoRetCode = GetRemoteArray( pPayload+4, PayloadLengthWoRetCode, PayloadLengthWoRetCode );
+
 	
+
+	//	debug
 	auto MsgType = static_cast<MsgTypes_E>(pSmsMsg->xMsgHeader.msgType);
-	std::Debug << "Control callback. Type " << MsgType << ", Retcode " << RetCode << ", Payload Length " << PayloadLength << std::endl;
+	std::Debug << "Control callback. message type " << MsgType << ", Payload Length " << PayloadLength << std::endl;
 	
 	switch( MsgType )
 	{
@@ -297,21 +330,17 @@ void SmsLiteMsControlRxCallback(  UINT32 handle_num, UINT8* p_buffer, UINT32 buf
 		break;
 			
 		case MSG_SMS_SIGNAL_DETECTED_IND:
-			ResponseMsgType = SMSHOSTLIB_MSG_SMS_SIGNAL_DETECTED_IND;
-			RetCode = SMSHOSTLIB_ERR_OK;
+			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_SMS_SIGNAL_DETECTED_IND, SMSHOSTLIB_ERR_OK, Payload );
 			break;
 
 		case MSG_SMS_NO_SIGNAL_IND:
-			ResponseMsgType = SMSHOSTLIB_MSG_SMS_NO_SIGNAL_IND;
-			RetCode = SMSHOSTLIB_ERR_OK;
+			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_SMS_NO_SIGNAL_IND, SMSHOSTLIB_ERR_OK, Payload );
 			break;
 
 		case MSG_SMS_ADD_PID_FILTER_RES:
 		{
-			ResponseMsgType = SMSHOSTLIB_MSG_ADD_PID_FILTER_RES;
-			pPayload = pPayloadWoRetCode;
-			PayloadLength = PayloadLengthWoRetCode;
-			
+			SMSHOSTLIB_ERR_CODES_E RetCode = SMSHOSTLIB_ERR_UNDEFINED_ERR;
+		
 			switch( RetCodeFromMsg )
 			{
 				case SMS_S_OK:
@@ -327,97 +356,56 @@ void SmsLiteMsControlRxCallback(  UINT32 handle_num, UINT8* p_buffer, UINT32 buf
 					RetCode = SMSHOSTLIB_ERR_UNDEFINED_ERR;
 					break;
 			}
+			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_ADD_PID_FILTER_RES, RetCode, PayloadWoRetCode );
 		}
-			break;
+		break;
+			
 		case MSG_SMS_REMOVE_PID_FILTER_RES:
 		{
-			ResponseMsgType = SMSHOSTLIB_MSG_REMOVE_PID_FILTER_RES;
-			pPayload = pPayloadWoRetCode;
-			PayloadLength = PayloadLengthWoRetCode;
-			RetCode = RetCodeFromMsg;
-			
+			SMSHOSTLIB_ERR_CODES_E RetCode = RetCodeFromMsg;
 			if ( RetCodeFromMsg == SMS_E_NOT_FOUND )
-			{
 				RetCode = SMSHOSTLIB_ERR_PID_FILTER_DOES_NOT_EXIST;
-			}
+			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_REMOVE_PID_FILTER_RES, RetCode, PayloadWoRetCode );
 		}
-			break;
+		break;
+		
 		case MSG_SMS_GET_PID_FILTER_LIST_RES:
-		{
-			ResponseMsgType = SMSHOSTLIB_MSG_RETRIEVE_PID_FILTER_LIST_RES;
-			pPayload = pPayloadWoRetCode;
-			PayloadLength = PayloadLengthWoRetCode;
-			RetCode = RetCodeFromMsg;
-		}
+			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_RETRIEVE_PID_FILTER_LIST_RES, RetCodeFromMsg, PayloadWoRetCode );
 			break;
+
 		case MSG_SMS_RF_TUNE_RES:
-		{
-			ResponseMsgType = SMSHOSTLIB_MSG_TUNE_RES;
-			pPayload = pPayloadWoRetCode;
-			PayloadLength = PayloadLengthWoRetCode;
-			RetCode = RetCodeFromMsg;
-		}
+			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_TUNE_RES, RetCodeFromMsg, PayloadWoRetCode );
 			break;
+	
 		case MSG_SMS_ISDBT_TUNE_RES:
-		{
-			ResponseMsgType = SMSHOSTLIB_MSG_ISDBT_TUNE_RES;
-			pPayload = pPayloadWoRetCode;
-			PayloadLength = PayloadLengthWoRetCode;
-			RetCode = RetCodeFromMsg;
-		}
+			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_ISDBT_TUNE_RES, RetCodeFromMsg, PayloadWoRetCode );
 			break;
+
 		case MSG_SMS_GET_STATISTICS_EX_RES:
-		{
 			// Statistics EX response - relevant only for ISDBT
-			pPayload = pPayloadWoRetCode;
-			PayloadLength = PayloadLengthWoRetCode;
-			ResponseMsgType = SMSHOSTLIB_MSG_GET_STATISTICS_EX_RES;
-			RetCode = RetCodeFromMsg;
-		}
+			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_GET_STATISTICS_EX_RES, RetCodeFromMsg, PayloadWoRetCode );
 			break;
+
 		case MSG_SMS_GET_STATISTICS_RES:
-		{
 			// Statistics EX response - relevant only for ISDBT
-			pPayload = pPayloadWoRetCode;
-			PayloadLength = PayloadLengthWoRetCode;
-			ResponseMsgType = SMSHOSTLIB_MSG_GET_STATISTICS_RES;
-			RetCode = RetCodeFromMsg;
-		}
+			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_GET_STATISTICS_RES, RetCodeFromMsg, PayloadWoRetCode );
 			break;
+		
 		case MSG_SMS_DUMMY_STAT_RES:
-		{
 			// I2C Statistics response - relevant only for DVB-T
 			//pPayload = pPayloadWoRetCode;
 			//PayloadLength = PayloadLengthWoRetCode;
-			ResponseMsgType = SMSHOSTLIB_MSG_GET_STATISTICS_RES;
-			RetCode = SMSHOSTLIB_ERR_OK;
-		}
+			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_GET_STATISTICS_RES, SMSHOSTLIB_ERR_OK, Payload );
 			break;
+
 		case MSG_SMS_SET_AES128_KEY_RES:
-		{
-			ResponseMsgType = SMSHOSTLIB_MSG_SET_AES128_KEY_RES;
-			pPayload = pPayloadWoRetCode;
-			PayloadLength = PayloadLengthWoRetCode;
-			RetCode = RetCodeFromMsg;
-		}
+			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_SET_AES128_KEY_RES, RetCodeFromMsg, PayloadWoRetCode );
 			break;
 		
 		default:
 			SmsLiteCommonControlRxHandler( handle_num, p_buffer, buff_size );
 			break;
 	}
-	
-	// Call the user callback
-	if ( ResponseMsgType != SMSHOSTLIB_MSG_INVALID_RESPONSE_VAL )
-	{
-		SmsLiteCallCtrlCallback( ResponseMsgType, RetCode, pPayload, PayloadLength );
-	}
-	
-}
-
-void FunctionTest()
-{
-	std::Debug << "called" <<std::endl;
 }
 
 class CountDevicesParams
@@ -701,7 +689,7 @@ bool TSianoLib::Iteration()
 	
 	if ( DoInit )
 	{
-		std::this_thread::sleep_for( std::chrono::milliseconds(6000) );
+		std::this_thread::sleep_for( std::chrono::milliseconds(3000) );
 		OnInit();
 	}
 
@@ -734,18 +722,7 @@ void TSianoLib::OnInit()
 		SmsMsg.msgData[0] = DeviceMode;
 		
 		SmsLiteAdrWriteMsg( (SmsMsgData_ST*)&SmsMsg );
-		/*
-		
-		mSyncFlag = false;
-		auto Result = SmsLiteSendCtrlMsg( (SmsMsgData_ST*)&SmsMsg );
-		
-		// Wait for device init response
-		if ( !SmsHostWaitForFlagSet( &mSyncFlag, 200 ) )
-		{
-			Error << "failed to init sms device";
-			return;
-		}
-		 */
+	
 	}
 /*
 	//	Set crystal message
