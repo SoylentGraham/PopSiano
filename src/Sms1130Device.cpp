@@ -277,143 +277,110 @@ void Redirect_SmsLiteCallCtrlCallback(SMSHOSTLIB_MSG_TYPE_RES_E ResponseMsgType,
 }
 
 
-void TSianoLib::OnControlCallback(ArrayBridge<char>&& Buffer)
+
+
+SianoContainer::SianoContainer() :
+SoyWorkerThread	( "SianoContainer", SoyWorkerWaitMode::Sleep )
 {
-	SmsMsgData_ST* pSmsMsg = reinterpret_cast<SmsMsgData_ST*>( Buffer.GetArray() );
-	if ( !Soy::Assert( Buffer.GetDataSize() >= pSmsMsg->xMsgHeader.msgLength, "Buffer too small for described message length" ) )
+	std::stringstream Error;
+	if ( !CreateContext(Error) )
 		return;
-	if ( !Soy::Assert( pSmsMsg->xMsgHeader.msgLength >= sizeof( SmsMsgHdr_ST ), "Message header larger than expected" ) )
-		return;
+	Start();
+}
+
+SianoContainer::~SianoContainer()
+{
+	WaitToFinish();
+	DestroyLib();
+}
+
+bool SianoContainer::InitLib(std::stringstream& Error)
+{
 	
-	auto* pPayload = reinterpret_cast<const char*>(&pSmsMsg->msgData[0]);
-	int PayloadLength = pSmsMsg->xMsgHeader.msgLength - sizeof( SmsMsgHdr_ST );
-	auto Payload = GetRemoteArray( pPayload, PayloadLength, PayloadLength );
 	
-	//	Return code and payload for the messages which have retcode as the first 4 bytes
-	SMSHOSTLIB_ERR_CODES_E RetCodeFromMsg = SMSHOSTLIB_ERR_UNDEFINED_ERR;
-	if ( PayloadLength >= 4 )
+	return true;
+}
+
+void SianoContainer::DestroyLib()
+{
+	mLib.reset();
+}
+
+void SianoContainer::GetDevices(ArrayBridge<TVideoDeviceMeta>& Metas)
+{
+	if ( mDevice )
 	{
-		RetCodeFromMsg = static_cast<SMSHOSTLIB_ERR_CODES_E>(pSmsMsg->msgData[0]);
-	}
-	int PayloadLengthWoRetCode = PayloadLength-4;
-	auto PayloadWoRetCode = GetRemoteArray( pPayload+4, PayloadLengthWoRetCode, PayloadLengthWoRetCode );
-	
-	
-	
-	//	debug
-	auto MsgType = static_cast<MsgTypes_E>(pSmsMsg->xMsgHeader.msgType);
-	std::Debug << "Control callback. message type " << MsgType << ", Payload Length " << PayloadLength << std::endl;
-	
-	switch( MsgType )
-	{
-		case MSG_SMS_NEW_CRYSTAL_RES:
-			OnNewCrystal( Buffer );
-			break;
-			
-		case MSG_SMS_INIT_DEVICE_RES:
-			OnDeviceInitialised( Buffer );
-			break;
-			
-		case MSG_SMS_TRANSMISSION_IND:
-		{
-			// Update the DVBT statistics. No need for a response to the app.
-			if ( !Soy::Assert( sizeof(mStats) == Payload.GetDataSize(), "Payload wrong size for TRANSMISSION_STATISTICS_ST" ) )
-				return;
-			
-			auto* Stats = reinterpret_cast<TRANSMISSION_STATISTICS_ST*>( Payload.GetArray() );
-			OnStats(*Stats);
-			//no need to correct guard interval (as opposed to old statistics message).
-			//CORRECT_STAT_BANDWIDTH(g_LibMsState.DvbtStatsCache.TransmissionData);
-			//CORRECT_STAT_TRANSMISSON_MODE(g_LibMsState.DvbtStatsCache.TransmissionData);
-		}
-			break;
-			
-			
-		case MSG_SMS_HO_PER_SLICES_IND:
-			// Update the DVBT statistics. No need for a response to the app.
-			//SmsHandlePerSlicesIndication(pSmsMsg);
-			OnHandoverPerSlicesIndication( GetArrayBridge(Payload) );
-			break;
-			
-		case MSG_SMS_SIGNAL_DETECTED_IND:
-			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_SMS_SIGNAL_DETECTED_IND, SMSHOSTLIB_ERR_OK, Payload );
-			break;
-			
-		case MSG_SMS_NO_SIGNAL_IND:
-			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_SMS_NO_SIGNAL_IND, SMSHOSTLIB_ERR_OK, Payload );
-			break;
-			
-		case MSG_SMS_ADD_PID_FILTER_RES:
-		{
-			SMSHOSTLIB_ERR_CODES_E RetCode = SMSHOSTLIB_ERR_UNDEFINED_ERR;
-			
-			switch( RetCodeFromMsg )
-			{
-				case SMS_S_OK:
-					RetCode = SMSHOSTLIB_ERR_OK;
-					break;
-				case SMS_E_ALREADY_EXISTING:
-					RetCode = SMSHOSTLIB_ERR_ALREADY_EXIST;
-					break;
-				case SMS_E_MAX_EXCEEDED:
-					RetCode = SMSHOSTLIB_ERR_LIST_FULL;
-					break;
-				default:
-					RetCode = SMSHOSTLIB_ERR_UNDEFINED_ERR;
-					break;
-			}
-			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_ADD_PID_FILTER_RES, RetCode, PayloadWoRetCode );
-		}
-			break;
-			
-		case MSG_SMS_REMOVE_PID_FILTER_RES:
-		{
-			SMSHOSTLIB_ERR_CODES_E RetCode = RetCodeFromMsg;
-			if ( RetCodeFromMsg == SMS_E_NOT_FOUND )
-				RetCode = SMSHOSTLIB_ERR_PID_FILTER_DOES_NOT_EXIST;
-			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_REMOVE_PID_FILTER_RES, RetCode, PayloadWoRetCode );
-		}
-			break;
-			
-		case MSG_SMS_GET_PID_FILTER_LIST_RES:
-			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_RETRIEVE_PID_FILTER_LIST_RES, RetCodeFromMsg, PayloadWoRetCode );
-			break;
-			
-		case MSG_SMS_RF_TUNE_RES:
-			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_TUNE_RES, RetCodeFromMsg, PayloadWoRetCode );
-			break;
-			
-		case MSG_SMS_ISDBT_TUNE_RES:
-			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_ISDBT_TUNE_RES, RetCodeFromMsg, PayloadWoRetCode );
-			break;
-			
-		case MSG_SMS_GET_STATISTICS_EX_RES:
-			// Statistics EX response - relevant only for ISDBT
-			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_GET_STATISTICS_EX_RES, RetCodeFromMsg, PayloadWoRetCode );
-			break;
-			
-		case MSG_SMS_GET_STATISTICS_RES:
-			// Statistics EX response - relevant only for ISDBT
-			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_GET_STATISTICS_RES, RetCodeFromMsg, PayloadWoRetCode );
-			break;
-			
-		case MSG_SMS_DUMMY_STAT_RES:
-			// I2C Statistics response - relevant only for DVB-T
-			//pPayload = pPayloadWoRetCode;
-			//PayloadLength = PayloadLengthWoRetCode;
-			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_GET_STATISTICS_RES, SMSHOSTLIB_ERR_OK, Payload );
-			break;
-			
-		case MSG_SMS_SET_AES128_KEY_RES:
-			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_SET_AES128_KEY_RES, RetCodeFromMsg, PayloadWoRetCode );
-			break;
-			
-		default:
-			std::Debug << "Passing " << MsgType << " to common SmsLite handler" << std::endl;
-			SmsLiteCommonControlRxHandler( GetHandleNumber(), reinterpret_cast<UINT8*>(Buffer.GetArray()), Buffer.GetDataSize() );
-			break;
+		Metas.PushBack( mDevice->GetMeta() );
 	}
 }
+
+
+bool SianoContainer::CreateContext(std::stringstream& Error)
+{
+	mLib.reset( new TSianoLib(Error) );
+	if ( !Error.str().empty() )
+	{
+		DestroyLib();
+		return false;
+	}
+	
+	mDevice.reset( new SianoDevice("tv", Error) );
+	return false;
+}
+
+bool SianoContainer::Iteration()
+{
+	return true;
+}
+
+std::shared_ptr<TVideoDevice> SianoContainer::AllocDevice(const TVideoDeviceMeta& Meta,std::stringstream& Error)
+{
+	//	gr: double check meta?
+	return mDevice;
+}
+
+
+SianoDevice::SianoDevice(const std::string& Serial,std::stringstream& Error) :
+TVideoDevice	( Serial, Error ),
+mSerial			( Serial )
+{
+	Open(Error);
+}
+
+TVideoDeviceMeta SianoDevice::GetMeta() const
+{
+	TVideoDeviceMeta Meta("tv");
+	return Meta;
+}
+
+bool SianoDevice::Open(std::stringstream& Error)
+{
+	return true;
+}
+
+void SianoDevice::Close()
+{
+}
+
+void SianoDevice::OnVideo(void *rgb, uint32_t timestamp)
+{
+	if ( !Soy::Assert( rgb, "rgb data expected" ) )
+		return;
+	/*
+	 //std::Debug << "On video " << timestamp << std::endl;
+	 
+	 auto& Pixels = mVideoBuffer.GetPixelsArray();
+	 int Bytes = std::min( mVideoMode.bytes, Pixels.GetDataSize() );
+	 memcpy( Pixels.GetArray(), rgb, Bytes );
+	 
+	 //	notify change
+	 SoyTime Timecode( static_cast<uint64>(timestamp) );
+	 OnNewFrame( mVideoBuffer, Timecode );
+	 */
+}
+
+
+
 
 class CountDevicesParams
 {
@@ -706,6 +673,13 @@ g_SignalQuality			( 0 )
 	Start();
 }
 
+
+TSianoLib::~TSianoLib()
+{
+	SmsLiteMsLibTerminate();
+}
+
+
 bool TSianoLib::Iteration()
 {
 	bool DoInit = false;
@@ -727,6 +701,7 @@ bool TSianoLib::Iteration()
 }
 
 
+
 void TSianoLib::OnInit()
 {
 	std::stringstream Error;
@@ -742,7 +717,7 @@ void TSianoLib::OnInit()
 		SmsMsg.xMsgHeader.msgLength = sizeof(SmsMsg);
 		SmsLiteAdrWriteMsg( &SmsMsg );
 	}
-
+	
 	{
 		SmsMsgData_ST SmsMsg = {0};
 		SMS_SET_HOST_DEVICE_STATIC_MSG_FIELDS( &SmsMsg );
@@ -753,7 +728,7 @@ void TSianoLib::OnInit()
 		SmsMsg.xMsgHeader.msgLength = sizeof(SmsMsg);
 		SmsLiteAdrWriteMsg( &SmsMsg );
 	}
-
+	
 	
 	{
 		SmsMsgData3Args_ST SmsMsg = {0};
@@ -807,9 +782,144 @@ void TSianoLib::OnInit()
 	 */
 }
 
-TSianoLib::~TSianoLib()
+
+
+void TSianoLib::OnControlCallback(ArrayBridge<char>&& Buffer)
 {
-	SmsLiteMsLibTerminate();
+	SmsMsgData_ST* pSmsMsg = reinterpret_cast<SmsMsgData_ST*>( Buffer.GetArray() );
+	if ( !Soy::Assert( Buffer.GetDataSize() >= pSmsMsg->xMsgHeader.msgLength, "Buffer too small for described message length" ) )
+		return;
+	if ( !Soy::Assert( pSmsMsg->xMsgHeader.msgLength >= sizeof( SmsMsgHdr_ST ), "Message header larger than expected" ) )
+		return;
+	
+	auto* pPayload = reinterpret_cast<const char*>(&pSmsMsg->msgData[0]);
+	int PayloadLength = pSmsMsg->xMsgHeader.msgLength - sizeof( SmsMsgHdr_ST );
+	auto Payload = GetRemoteArray( pPayload, PayloadLength, PayloadLength );
+	
+	//	Return code and payload for the messages which have retcode as the first 4 bytes
+	SMSHOSTLIB_ERR_CODES_E RetCodeFromMsg = SMSHOSTLIB_ERR_UNDEFINED_ERR;
+	if ( PayloadLength >= 4 )
+	{
+		RetCodeFromMsg = static_cast<SMSHOSTLIB_ERR_CODES_E>(pSmsMsg->msgData[0]);
+	}
+	int PayloadLengthWoRetCode = PayloadLength-4;
+	auto PayloadWoRetCode = GetRemoteArray( pPayload+4, PayloadLengthWoRetCode, PayloadLengthWoRetCode );
+	
+	
+	
+	//	debug
+	auto MsgType = static_cast<MsgTypes_E>(pSmsMsg->xMsgHeader.msgType);
+	std::Debug << "Control callback. message type " << MsgType << ", Payload Length " << PayloadLength << std::endl;
+	
+	switch( MsgType )
+	{
+		case MSG_SMS_NEW_CRYSTAL_RES:
+			OnNewCrystal( Buffer );
+			break;
+			
+		case MSG_SMS_INIT_DEVICE_RES:
+			OnDeviceInitialised( Buffer );
+			break;
+			
+		case MSG_SMS_TRANSMISSION_IND:
+		{
+			// Update the DVBT statistics. No need for a response to the app.
+			if ( !Soy::Assert( sizeof(mStats) == Payload.GetDataSize(), "Payload wrong size for TRANSMISSION_STATISTICS_ST" ) )
+				return;
+			
+			auto* Stats = reinterpret_cast<TRANSMISSION_STATISTICS_ST*>( Payload.GetArray() );
+			OnStats(*Stats);
+			//no need to correct guard interval (as opposed to old statistics message).
+			//CORRECT_STAT_BANDWIDTH(g_LibMsState.DvbtStatsCache.TransmissionData);
+			//CORRECT_STAT_TRANSMISSON_MODE(g_LibMsState.DvbtStatsCache.TransmissionData);
+		}
+			break;
+			
+			
+		case MSG_SMS_HO_PER_SLICES_IND:
+			// Update the DVBT statistics. No need for a response to the app.
+			//SmsHandlePerSlicesIndication(pSmsMsg);
+			OnHandoverPerSlicesIndication( GetArrayBridge(Payload) );
+			break;
+			
+		case MSG_SMS_SIGNAL_DETECTED_IND:
+			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_SMS_SIGNAL_DETECTED_IND, SMSHOSTLIB_ERR_OK, Payload );
+			break;
+			
+		case MSG_SMS_NO_SIGNAL_IND:
+			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_SMS_NO_SIGNAL_IND, SMSHOSTLIB_ERR_OK, Payload );
+			break;
+			
+		case MSG_SMS_ADD_PID_FILTER_RES:
+		{
+			SMSHOSTLIB_ERR_CODES_E RetCode = SMSHOSTLIB_ERR_UNDEFINED_ERR;
+			
+			switch( RetCodeFromMsg )
+			{
+				case SMS_S_OK:
+					RetCode = SMSHOSTLIB_ERR_OK;
+					break;
+				case SMS_E_ALREADY_EXISTING:
+					RetCode = SMSHOSTLIB_ERR_ALREADY_EXIST;
+					break;
+				case SMS_E_MAX_EXCEEDED:
+					RetCode = SMSHOSTLIB_ERR_LIST_FULL;
+					break;
+				default:
+					RetCode = SMSHOSTLIB_ERR_UNDEFINED_ERR;
+					break;
+			}
+			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_ADD_PID_FILTER_RES, RetCode, PayloadWoRetCode );
+		}
+			break;
+			
+		case MSG_SMS_REMOVE_PID_FILTER_RES:
+		{
+			SMSHOSTLIB_ERR_CODES_E RetCode = RetCodeFromMsg;
+			if ( RetCodeFromMsg == SMS_E_NOT_FOUND )
+				RetCode = SMSHOSTLIB_ERR_PID_FILTER_DOES_NOT_EXIST;
+			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_REMOVE_PID_FILTER_RES, RetCode, PayloadWoRetCode );
+		}
+			break;
+			
+		case MSG_SMS_GET_PID_FILTER_LIST_RES:
+			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_RETRIEVE_PID_FILTER_LIST_RES, RetCodeFromMsg, PayloadWoRetCode );
+			break;
+			
+		case MSG_SMS_RF_TUNE_RES:
+			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_TUNE_RES, RetCodeFromMsg, PayloadWoRetCode );
+			break;
+			
+		case MSG_SMS_ISDBT_TUNE_RES:
+			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_ISDBT_TUNE_RES, RetCodeFromMsg, PayloadWoRetCode );
+			break;
+			
+		case MSG_SMS_GET_STATISTICS_EX_RES:
+			// Statistics EX response - relevant only for ISDBT
+			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_GET_STATISTICS_EX_RES, RetCodeFromMsg, PayloadWoRetCode );
+			break;
+			
+		case MSG_SMS_GET_STATISTICS_RES:
+			// Statistics EX response - relevant only for ISDBT
+			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_GET_STATISTICS_RES, RetCodeFromMsg, PayloadWoRetCode );
+			break;
+			
+		case MSG_SMS_DUMMY_STAT_RES:
+			// I2C Statistics response - relevant only for DVB-T
+			//pPayload = pPayloadWoRetCode;
+			//PayloadLength = PayloadLengthWoRetCode;
+			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_GET_STATISTICS_RES, SMSHOSTLIB_ERR_OK, Payload );
+			break;
+			
+		case MSG_SMS_SET_AES128_KEY_RES:
+			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_SET_AES128_KEY_RES, RetCodeFromMsg, PayloadWoRetCode );
+			break;
+			
+		default:
+			std::Debug << "Passing " << MsgType << " to common SmsLite handler" << std::endl;
+			SmsLiteCommonControlRxHandler( GetHandleNumber(), reinterpret_cast<UINT8*>(Buffer.GetArray()), Buffer.GetDataSize() );
+			break;
+	}
 }
 
 
@@ -938,128 +1048,6 @@ void TSianoLib::OnStats(const SMSHOSTLIB_FAST_STATISTICS_ST& Stats)
 	
 }
 
-
-
-SianoContainer::SianoContainer() :
-SoyWorkerThread	( "SianoContainer", SoyWorkerWaitMode::Sleep )
-{
-	std::stringstream Error;
-	if ( !CreateContext(Error) )
-		return;
-	Start();
-}
-
-SianoContainer::~SianoContainer()
-{
-	WaitToFinish();
-	DestroyLib();
-}
-
-
-//*******************************************************************************
-// Control callback function. This function is being given to SMS11xx host library
-//as a callback for control events.
-//
-
-
-bool SianoContainer::InitLib(std::stringstream& Error)
-{
-	
-	
-	return true;
-}
-
-void SianoContainer::DestroyLib()
-{
-	mLib.reset();
-}
-
-void SianoContainer::GetDevices(ArrayBridge<TVideoDeviceMeta>& Metas)
-{
-	if ( mDevice )
-	{
-		Metas.PushBack( mDevice->GetMeta() );
-	}
-}
-
-
-bool SianoContainer::CreateContext(std::stringstream& Error)
-{
-	mLib.reset( new TSianoLib(Error) );
-	if ( !Error.str().empty() )
-	{
-		DestroyLib();
-		return false;
-	}
-	
-	mDevice.reset( new SianoDevice("tv", Error) );
-	return false;
-}
-
-bool SianoContainer::Iteration()
-{
-	/*
-	 std::lock_guard<std::recursive_mutex> Lock(mContextLock);
-	 
-	 //	gr: use this for the thread block
-	 int TimeoutMs = 10;
-	 int TimeoutSecs = 0;
-	 int TimeoutMicroSecs = TimeoutMs*1000;
-	 timeval Timeout = {TimeoutSecs,TimeoutMicroSecs};
-	 auto Result = freenect_process_events_timeout( mContext, &Timeout );
-	 if ( Result < 0 )
-	 {
-	 std::Debug << "Freenect_events error: " << Result;
-	 }
-	 */
-	return true;
-}
-
-std::shared_ptr<TVideoDevice> SianoContainer::AllocDevice(const TVideoDeviceMeta& Meta,std::stringstream& Error)
-{
-	//	gr: double check meta?
-	return mDevice;
-}
-
-
-SianoDevice::SianoDevice(const std::string& Serial,std::stringstream& Error) :
-TVideoDevice	( Serial, Error ),
-mSerial			( Serial )
-{
-	Open(Error);
-}
-
-TVideoDeviceMeta SianoDevice::GetMeta() const
-{
-	TVideoDeviceMeta Meta("tv");
-	return Meta;
-}
-
-bool SianoDevice::Open(std::stringstream& Error)
-{
-	return true;
-}
-
-void SianoDevice::Close()
-{
-}
-
-void SianoDevice::OnVideo(void *rgb, uint32_t timestamp)
-{
-	if ( !Soy::Assert( rgb, "rgb data expected" ) )
-		return;
-	/*
-	 //std::Debug << "On video " << timestamp << std::endl;
-	 
-	 auto& Pixels = mVideoBuffer.GetPixelsArray();
-	 int Bytes = std::min( mVideoMode.bytes, Pixels.GetDataSize() );
-	 memcpy( Pixels.GetArray(), rgb, Bytes );
-	 
-	 //	notify change
-	 SoyTime Timecode( static_cast<uint64>(timestamp) );
-	 OnNewFrame( mVideoBuffer, Timecode );
-	 */
-}
 
 
 
