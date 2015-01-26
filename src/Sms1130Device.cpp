@@ -6,7 +6,7 @@
 #include "TChannel.h"
 
 
-				
+
 typedef uint32 UINT32;
 typedef uint16 UINT16;
 typedef uint8 UINT8;
@@ -47,7 +47,8 @@ std::map<SmsMsgTypes::Type,std::string> SmsMsgTypes::EnumMap =
 	DEFINE_SOYENUM( MSG_SMS_POWER_UP_CONF ),
 	DEFINE_SOYENUM( MSG_SMS_CMMB_GET_CHANNELS_INFO_REQ ),
 	DEFINE_SOYENUM( MSG_SMS_CMMB_GET_CHANNELS_INFO_RES ),
-	
+	DEFINE_SOYENUM( MSG_SMS_HO_PER_SLICES_IND ),
+	DEFINE_SOYENUM( MSG_SMS_INIT_DEVICE_RES ),
 };
 
 std::ostream& operator<< ( std::ostream &out, const MsgTypes_E &in )
@@ -110,18 +111,28 @@ public:
 	TSianoLib(std::stringstream& Error);
 	~TSianoLib();
 	
-	void	IsdbtUserCtrlCallback( SMSHOSTLIB_MSG_TYPE_RES_E	MsgType,
-										  SMSHOSTLIB_ERR_CODES_E		ErrCode,
-										  void* 						pPayload,
-										  UINT32						PayloadLen);
-	void	IsdbtUserDataCallback(UINT32 ServiceDevHandle,UINT8* pBuf,UINT32 BufSize);
-
-	 void	OnInit();
-
+	void				OnInit();
+	
 	virtual bool		Iteration() override;
 	
+	void				OnDataCallback(ArrayBridge<char>&& Buffer);
+	void				OnControlCallback(ArrayBridge<char>&& Buffer);
+	void				OnLiteControlCallback(SMSHOSTLIB_MSG_TYPE_RES_E	MsgType,SMSHOSTLIB_ERR_CODES_E ErrCode,ArrayBridge<char>&& Buffer);
+	
+	
+	UINT32				GetHandleNumber() const			{	return 0;	}
+	
+	void				OnNewCrystal(const ArrayBridge<char>& Data);
+	void				OnDeviceInitialised(const ArrayBridge<char>& Data);
+	void				OnNoSignal(const ArrayBridge<char>& Payload);
+	void				OnDetectedSignal(const ArrayBridge<char>& Payload);
+	
+	void				OnStats(const TRANSMISSION_STATISTICS_ST& Stats);
+	void				OnStats(const SMSHOSTLIB_STATISTICS_ISDBT_ST& Stats);
+	void				OnStats(const SMSHOSTLIB_FAST_STATISTICS_ST& Stats);
+	
 public:
-	SoyEvent<bool>		mOnDeviceInitialised;
+	TRANSMISSION_STATISTICS_ST				mStats;
 	
 	IsdbtState_ST g_IsdbtState;
 	bool g_bHaveSignalIndicator;
@@ -134,7 +145,7 @@ public:
 	char g_SignalQuality;
 	
 	Array<Array<uint8>>	mDataCallbacks;
-
+	
 	ofMutexM<bool>	mDoInit;
 };
 
@@ -157,10 +168,10 @@ UINT32 GetReceptionQuality( SMSHOSTLIB_STATISTICS_ISDBT_ST* StatParams )
 }
 
 /*
-extern SmsLiteMsGlobalState_ST	g_LibMsState				= { 0 };
-
-SMSHOSTLIB_ERR_CODES_E SmsLiteMsLibInit( SMSHOSTLIBLITE_MS_INITLIB_PARAMS_ST* pInitLibParams )
-{
+ extern SmsLiteMsGlobalState_ST	g_LibMsState				= { 0 };
+ 
+ SMSHOSTLIB_ERR_CODES_E SmsLiteMsLibInit( SMSHOSTLIBLITE_MS_INITLIB_PARAMS_ST* pInitLibParams )
+ {
 	SMSHOSTLIBLITE_MS_INITLIB_PARAMS_ST LocalInitParams = {0};
 	SMSHOSTLIB_ERR_CODES_E RetCode = SMSHOSTLIB_ERR_OK;
 	SmsMsgData3Args_ST SmsMsg = {0};
@@ -170,19 +181,19 @@ SMSHOSTLIB_ERR_CODES_E SmsLiteMsLibInit( SMSHOSTLIBLITE_MS_INITLIB_PARAMS_ST* pI
 	
 	if ( g_LibMsState.IsLibInit )
 	{
-		SMSHOST_LOG1(SMSLOG_APIS | SMSLOG_ERROR,"Return err 0x%x",SMSHOSTLIB_ERR_LIB_ALREADY_INITIATED);
-		return SMSHOSTLIB_ERR_LIB_ALREADY_INITIATED;
+ SMSHOST_LOG1(SMSLOG_APIS | SMSLOG_ERROR,"Return err 0x%x",SMSHOSTLIB_ERR_LIB_ALREADY_INITIATED);
+ return SMSHOSTLIB_ERR_LIB_ALREADY_INITIATED;
 	}
 	
 	//ZERO_MEM_OBJ(&g_LibMsState);
 	memset(&g_LibMsState, 0, sizeof(g_LibMsState)); //jan
 	
 	if ( pInitLibParams == NULL
-		|| pInitLibParams->pCtrlCallback == NULL
-		|| pInitLibParams->Size == 0 )
+ || pInitLibParams->pCtrlCallback == NULL
+ || pInitLibParams->Size == 0 )
 	{
-		SMSHOST_LOG1(SMSLOG_APIS | SMSLOG_ERROR,"Return err 0x%x",SMSHOSTLIB_ERR_INVALID_ARG);
-		return SMSHOSTLIB_ERR_INVALID_ARG;
+ SMSHOST_LOG1(SMSLOG_APIS | SMSLOG_ERROR,"Return err 0x%x",SMSHOSTLIB_ERR_INVALID_ARG);
+ return SMSHOSTLIB_ERR_INVALID_ARG;
 	}
 	memcpy( &LocalInitParams, pInitLibParams, pInitLibParams->Size );
 	
@@ -194,17 +205,17 @@ SMSHOSTLIB_ERR_CODES_E SmsLiteMsLibInit( SMSHOSTLIBLITE_MS_INITLIB_PARAMS_ST* pI
 	g_LibMsState.Crystal = LocalInitParams.Crystal;
 	if ( LocalInitParams.Crystal == 0 )
 	{
-		g_LibMsState.Crystal = SMSHOSTLIB_DEFAULT_CRYSTAL;
+ g_LibMsState.Crystal = SMSHOSTLIB_DEFAULT_CRYSTAL;
 	}
 	
 	RetCode = SmsLiteAdrInit( g_LibMsState.DeviceMode,
-							 SmsLiteMsControlRxCallback,
-							 SmsLiteMsDataCallback );
+ SmsLiteMsControlRxCallback,
+ SmsLiteMsDataCallback );
 	
 	if ( RetCode != SMSHOSTLIB_ERR_OK )
 	{
-		SMSHOST_LOG1(SMSLOG_APIS | SMSLOG_ERROR,"Return err 0x%x",RetCode);
-		return RetCode ;
+ SMSHOST_LOG1(SMSLOG_APIS | SMSLOG_ERROR,"Return err 0x%x",RetCode);
+ return RetCode ;
 	}
 	
 	// Device init message
@@ -220,40 +231,40 @@ SMSHOSTLIB_ERR_CODES_E SmsLiteMsLibInit( SMSHOSTLIBLITE_MS_INITLIB_PARAMS_ST* pI
 	// Wait for device init response
 	if ( !SmsHostWaitForFlagSet( &g_LibMsState.SyncFlag, 200 ) )
 	{
-		return SMSHOSTLIB_ERR_DEVICE_NOT_INITIATED;
+ return SMSHOSTLIB_ERR_DEVICE_NOT_INITIATED;
 	}
 	
 	
 	// Set crystal message
 	if ( g_LibMsState.Crystal != SMSHOSTLIB_DEFAULT_CRYSTAL )
 	{
-		SMS_SET_HOST_DEVICE_STATIC_MSG_FIELDS( &SmsMsg );
-		SmsMsg.xMsgHeader.msgType  = MSG_SMS_NEW_CRYSTAL_REQ;
-		SmsMsg.xMsgHeader.msgLength = (UINT16)sizeof(SmsMsg);
-		
-		SmsMsg.msgData[0] = g_LibMsState.Crystal;
-		
-		g_LibMsState.SyncFlag = FALSE;
-		SmsLiteSendCtrlMsg( (SmsMsgData_ST*)&SmsMsg );
-		
-		// Wait for device init response
-		if ( !SmsHostWaitForFlagSet( &g_LibMsState.SyncFlag, 200 ) )
-		{
-			return SMSHOSTLIB_ERR_DEVICE_NOT_INITIATED;
-		}
+ SMS_SET_HOST_DEVICE_STATIC_MSG_FIELDS( &SmsMsg );
+ SmsMsg.xMsgHeader.msgType  = MSG_SMS_NEW_CRYSTAL_REQ;
+ SmsMsg.xMsgHeader.msgLength = (UINT16)sizeof(SmsMsg);
+ 
+ SmsMsg.msgData[0] = g_LibMsState.Crystal;
+ 
+ g_LibMsState.SyncFlag = FALSE;
+ SmsLiteSendCtrlMsg( (SmsMsgData_ST*)&SmsMsg );
+ 
+ // Wait for device init response
+ if ( !SmsHostWaitForFlagSet( &g_LibMsState.SyncFlag, 200 ) )
+ {
+ return SMSHOSTLIB_ERR_DEVICE_NOT_INITIATED;
+ }
 	}
 	
 	
 	g_LibMsState.IsLibInit = TRUE ;
-#ifdef SMSHOST_ENABLE_LOGS
+ #ifdef SMSHOST_ENABLE_LOGS
 	SmsLiteSetDeviceFwLogState();
-#endif
+ #endif
 	
 	//SmsLiteGetVersion_Req();
 	
 	SMSHOST_LOG0(SMSLOG_APIS,"LibInit OK");
 	return SMSHOSTLIB_ERR_OK;
-}
+ }
  */
 
 
@@ -264,19 +275,14 @@ void Redirect_SmsLiteCallCtrlCallback(SMSHOSTLIB_MSG_TYPE_RES_E ResponseMsgType,
 }
 
 
-void SmsLiteMsControlRxCallback(  UINT32 handle_num, UINT8* p_buffer, UINT32 buff_size )
+void TSianoLib::OnControlCallback(ArrayBridge<char>&& Buffer)
 {
-	if ( !Soy::Assert( p_buffer != nullptr && buff_size > 0, "invalid buffer spec" ) )
-		return;
-
-	SmsMsgData_ST* pSmsMsg = reinterpret_cast<SmsMsgData_ST*>(p_buffer);
-	if ( !Soy::Assert( handle_num == 0, "expecting only 0 handle" ) )
-		return;
-	if ( !Soy::Assert( buff_size >= pSmsMsg->xMsgHeader.msgLength, "Buffer too small for described message length" ) )
+	SmsMsgData_ST* pSmsMsg = reinterpret_cast<SmsMsgData_ST*>( Buffer.GetArray() );
+	if ( !Soy::Assert( Buffer.GetDataSize() >= pSmsMsg->xMsgHeader.msgLength, "Buffer too small for described message length" ) )
 		return;
 	if ( !Soy::Assert( pSmsMsg->xMsgHeader.msgLength >= sizeof( SmsMsgHdr_ST ), "Message header larger than expected" ) )
 		return;
-
+	
 	auto* pPayload = reinterpret_cast<const char*>(&pSmsMsg->msgData[0]);
 	int PayloadLength = pSmsMsg->xMsgHeader.msgLength - sizeof( SmsMsgHdr_ST );
 	auto Payload = GetRemoteArray( pPayload, PayloadLength, PayloadLength );
@@ -289,9 +295,9 @@ void SmsLiteMsControlRxCallback(  UINT32 handle_num, UINT8* p_buffer, UINT32 buf
 	}
 	int PayloadLengthWoRetCode = PayloadLength-4;
 	auto PayloadWoRetCode = GetRemoteArray( pPayload+4, PayloadLengthWoRetCode, PayloadLengthWoRetCode );
-
 	
-
+	
+	
 	//	debug
 	auto MsgType = static_cast<MsgTypes_E>(pSmsMsg->xMsgHeader.msgType);
 	std::Debug << "Control callback. message type " << MsgType << ", Payload Length " << PayloadLength << std::endl;
@@ -301,25 +307,27 @@ void SmsLiteMsControlRxCallback(  UINT32 handle_num, UINT8* p_buffer, UINT32 buf
 		case MSG_SMS_NEW_CRYSTAL_RES:
 			//g_LibMsState.SyncFlag = TRUE;
 			std::Debug << "new crystal" << std::endl;
+			OnNewCrystal( Buffer );
 			break;
 			
 		case MSG_SMS_INIT_DEVICE_RES:
 			std::Debug << "init device res" << std::endl;
+			OnDeviceInitialised( Buffer );
 			break;
-
+			
 		case MSG_SMS_TRANSMISSION_IND:
 		{
 			// Update the DVBT statistics. No need for a response to the app.
-			static TRANSMISSION_STATISTICS_ST Stats;
+			if ( !Soy::Assert( sizeof(mStats) == Payload.GetDataSize(), "Payload wrong size for TRANSMISSION_STATISTICS_ST" ) )
+				return;
 			
-			memcpy(	&Stats, pSmsMsg->msgData, sizeof(Stats) );
-			//g_LibMsState.DvbtStatsCache.ReceptionData.IsDemodLocked = 0;
-			
+			auto* Stats = reinterpret_cast<TRANSMISSION_STATISTICS_ST*>( Payload.GetArray() );
+			OnStats(*Stats);
 			//no need to correct guard interval (as opposed to old statistics message).
 			//CORRECT_STAT_BANDWIDTH(g_LibMsState.DvbtStatsCache.TransmissionData);
 			//CORRECT_STAT_TRANSMISSON_MODE(g_LibMsState.DvbtStatsCache.TransmissionData);
 		}
-		break;
+			break;
 			
 			
 		case MSG_SMS_HO_PER_SLICES_IND:
@@ -327,20 +335,20 @@ void SmsLiteMsControlRxCallback(  UINT32 handle_num, UINT8* p_buffer, UINT32 buf
 			// Update the DVBT statistics. No need for a response to the app.
 			//SmsHandlePerSlicesIndication(pSmsMsg);
 		}
-		break;
+			break;
 			
 		case MSG_SMS_SIGNAL_DETECTED_IND:
 			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_SMS_SIGNAL_DETECTED_IND, SMSHOSTLIB_ERR_OK, Payload );
 			break;
-
+			
 		case MSG_SMS_NO_SIGNAL_IND:
 			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_SMS_NO_SIGNAL_IND, SMSHOSTLIB_ERR_OK, Payload );
 			break;
-
+			
 		case MSG_SMS_ADD_PID_FILTER_RES:
 		{
 			SMSHOSTLIB_ERR_CODES_E RetCode = SMSHOSTLIB_ERR_UNDEFINED_ERR;
-		
+			
 			switch( RetCodeFromMsg )
 			{
 				case SMS_S_OK:
@@ -358,7 +366,7 @@ void SmsLiteMsControlRxCallback(  UINT32 handle_num, UINT8* p_buffer, UINT32 buf
 			}
 			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_ADD_PID_FILTER_RES, RetCode, PayloadWoRetCode );
 		}
-		break;
+			break;
 			
 		case MSG_SMS_REMOVE_PID_FILTER_RES:
 		{
@@ -367,43 +375,43 @@ void SmsLiteMsControlRxCallback(  UINT32 handle_num, UINT8* p_buffer, UINT32 buf
 				RetCode = SMSHOSTLIB_ERR_PID_FILTER_DOES_NOT_EXIST;
 			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_REMOVE_PID_FILTER_RES, RetCode, PayloadWoRetCode );
 		}
-		break;
-		
+			break;
+			
 		case MSG_SMS_GET_PID_FILTER_LIST_RES:
 			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_RETRIEVE_PID_FILTER_LIST_RES, RetCodeFromMsg, PayloadWoRetCode );
 			break;
-
+			
 		case MSG_SMS_RF_TUNE_RES:
 			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_TUNE_RES, RetCodeFromMsg, PayloadWoRetCode );
 			break;
-	
+			
 		case MSG_SMS_ISDBT_TUNE_RES:
 			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_ISDBT_TUNE_RES, RetCodeFromMsg, PayloadWoRetCode );
 			break;
-
+			
 		case MSG_SMS_GET_STATISTICS_EX_RES:
 			// Statistics EX response - relevant only for ISDBT
 			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_GET_STATISTICS_EX_RES, RetCodeFromMsg, PayloadWoRetCode );
 			break;
-
+			
 		case MSG_SMS_GET_STATISTICS_RES:
 			// Statistics EX response - relevant only for ISDBT
 			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_GET_STATISTICS_RES, RetCodeFromMsg, PayloadWoRetCode );
 			break;
-		
+			
 		case MSG_SMS_DUMMY_STAT_RES:
 			// I2C Statistics response - relevant only for DVB-T
 			//pPayload = pPayloadWoRetCode;
 			//PayloadLength = PayloadLengthWoRetCode;
 			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_GET_STATISTICS_RES, SMSHOSTLIB_ERR_OK, Payload );
 			break;
-
+			
 		case MSG_SMS_SET_AES128_KEY_RES:
 			Redirect_SmsLiteCallCtrlCallback( SMSHOSTLIB_MSG_SET_AES128_KEY_RES, RetCodeFromMsg, PayloadWoRetCode );
 			break;
-		
+			
 		default:
-			SmsLiteCommonControlRxHandler( handle_num, p_buffer, buff_size );
+			SmsLiteCommonControlRxHandler( GetHandleNumber(), reinterpret_cast<UINT8*>(Buffer.GetArray()), Buffer.GetDataSize() );
 			break;
 	}
 }
@@ -439,7 +447,7 @@ public:
 	uint32	mProduct;	//	4
 	uint32*	mNull;		//	8
 	uint32* mDataRead;		//	12
-
+	
 	uint32*	mx700;	//	value is 0x700/1792
 	uint32	mBufferSize;	//	value is 0x200/512
 	char	mDummy[4+12];
@@ -464,9 +472,9 @@ class TUsbDeviceIdentifier
 {
 public:
 	TUsbDeviceIdentifier(int Vendor,int Product,const std::string& Filename) :
-		mVendor				( Vendor ),
-		mProduct			( Product ),
-		mFirmwareFilename	( Filename )
+	mVendor				( Vendor ),
+	mProduct			( Product ),
+	mFirmwareFilename	( Filename )
 	{
 	}
 	
@@ -484,11 +492,10 @@ class RegisterUsbStruct
 {
 public:
 	RegisterUsbStruct() :
-		Pad						{ 0,1,2,3 },
-		mFirmwareDownloadCallback	( &DownloadFirmware ),
-		mCountDevicesCallback	( &CountDevices ),
-		mTryRegisterCallback	( &TryRegister ),
-		Data		{ 8,9,10,11,12,13,14,15,16,17,18,19,20,21,22 }
+	Pad						{ 0,1,2,3 },
+	mFirmwareDownloadCallback	( &DownloadFirmware ),
+	mCountDevicesCallback	( &CountDevices ),
+	mTryRegisterCallback	( &TryRegister )
 	{
 		std::Debug << "this(RegisterUsbStruct*): " << this << std::endl;
 		for ( int d=0;	d<sizeofarray(Data);	d++ )
@@ -513,7 +520,7 @@ public:
 		//	get filename into buffer for caller
 		std::Debug << "Sending firmware filename; " << Device->mFirmwareFilename << std::endl;
 		strcpy( a.mFilenameBuffer, Device->mFirmwareFilename.c_str() );
-
+		
 		std::Debug << "stack addr: " << (void*)(&a) << std::endl;
 		
 		return true;
@@ -529,7 +536,7 @@ public:
 	{
 		*a.mProduct = Devices[a.mDeviceIndex].mProduct;
 		*a.mVendor = Devices[a.mDeviceIndex].mVendor;
-
+		
 		std::Debug << "TryRegister(" << (int)a.mDeviceIndex << ") ";
 		std::Debug << "[c]" << a.c << " ";
 		std::Debug << "[thou]" << a.thousand << " ";
@@ -540,7 +547,7 @@ public:
 		std::Debug.unsetf(std::ios::hex);
 		std::Debug << std::endl;
 		static int ret = 0;
-//		std::this_thread::sleep_for( std::chrono::milliseconds(1000) );
+		//		std::this_thread::sleep_for( std::chrono::milliseconds(1000) );
 		return ret;
 	}
 	
@@ -552,27 +559,7 @@ public:
 };
 
 
-auto CallbackWrapper = [](SMSHOSTLIB_MSG_TYPE_RES_E	MsgType,		//!< Response type
-						  SMSHOSTLIB_ERR_CODES_E		ErrCode,		//!< Response success code
-						  UINT8* 						pPayload,		//!< Response payload
-						  UINT32						PayloadLen)
-{
-	gLib->IsdbtUserCtrlCallback( MsgType, ErrCode, pPayload, PayloadLen );
-};
 
-auto DataCallbackWrapper = [](UINT32 ServiceDevHandle,UINT8* pBuf,UINT32 BufSize)
-{
-	gLib->IsdbtUserDataCallback( ServiceDevHandle, pBuf, BufSize );
-};
-
-auto DeviceCallbackWrapper = [](void* ClientPtr1, UINT32 handle_num1, UINT8* p_buffer1, UINT32 buff_size1, UINT32 xx)
-{
-	std::Debug << "device callback" << std::endl;
-	//		typedef void ( *ADR_pfnFuncCb1 )(  void* ClientPtr1, UINT32 handle_num1, UINT8* p_buffer1, UINT32 buff_size1, UINT32 xx );
-	
-};
-		
-		
 
 class OnDeviceChangedParams
 {
@@ -629,39 +616,76 @@ auto DeviceMode = SMSHOSTLIB_DEVMD_DVBT;
 
 
 TSianoLib::TSianoLib(std::stringstream& Error) :
-	SoyWorkerThread			( "SianoLib", SoyWorkerWaitMode::Sleep ),
-	g_bHaveSignalIndicator	( false ),
-	g_bDummyHaveSignal		( false ),
-	g_SignalStrength		( 0 ),
-	g_SNR					( 0 ),
-	g_BER					( 0 ),
-	g_RSSI					( 0 ),
-	g_InBandPower			( 0 ),
-	g_SignalQuality			( 0 )
+SoyWorkerThread			( "SianoLib", SoyWorkerWaitMode::Sleep ),
+g_bHaveSignalIndicator	( false ),
+g_bDummyHaveSignal		( false ),
+g_SignalStrength		( 0 ),
+g_SNR					( 0 ),
+g_BER					( 0 ),
+g_RSSI					( 0 ),
+g_InBandPower			( 0 ),
+g_SignalQuality			( 0 )
 {
 	gLib = this;
 	static RegisterUsbStruct Dummy;
-
+	
+	auto ControlCallbackWrapper = [](UINT32 handle_num,UINT8* p_buffer,UINT32 buff_size)
+	{
+		if ( !Soy::Assert( p_buffer != nullptr && buff_size > 0, "invalid buffer spec" ) )
+			return;
+		if ( !Soy::Assert( handle_num == gLib->GetHandleNumber(), "expecting only 0 handle" ) )
+			return;
+		
+		int BufferSize = buff_size;
+		auto Buffer = GetRemoteArray( reinterpret_cast<const char*>(p_buffer), BufferSize, BufferSize );
+		//SmsMsgData_ST* pSmsMsg = reinterpret_cast<SmsMsgData_ST*>(p_buffer);
+		gLib->OnControlCallback( GetArrayBridge( Buffer ) );
+	};
+	
+	auto LiteControlCallbackWrapper = [](SMSHOSTLIB_MSG_TYPE_RES_E	MsgType,		//!< Response type
+										 SMSHOSTLIB_ERR_CODES_E		ErrCode,		//!< Response success code
+										 UINT8* 						p_buffer,		//!< Response payload
+										 UINT32						buff_size)
+	{
+		if ( !Soy::Assert( p_buffer != nullptr && buff_size > 0, "invalid buffer spec" ) )
+			return;
+		int BufferSize = buff_size;
+		auto Buffer = GetRemoteArray( reinterpret_cast<const char*>(p_buffer), BufferSize, BufferSize );
+		gLib->OnLiteControlCallback( MsgType, ErrCode, GetArrayBridge(Buffer) );
+	};
+	
+	auto DataCallbackWrapper = [](UINT32 handle_num,UINT8* p_buffer,UINT32 buff_size)
+	{
+		if ( !Soy::Assert( p_buffer != nullptr && buff_size > 0, "invalid buffer spec" ) )
+			return;
+		if ( !Soy::Assert( handle_num == gLib->GetHandleNumber(), "expecting only 0 handle" ) )
+			return;
+		
+		int BufferSize = buff_size;
+		auto Buffer = GetRemoteArray( reinterpret_cast<const char*>(p_buffer), BufferSize, BufferSize );
+		gLib->OnDataCallback( GetArrayBridge(Buffer) );
+	};
+	
 	
 	//	initialise devices before we can communicate
 	SMSHOSTLIB_ERR_CODES_E Result = SmsAdr_RegisterUSBPersonalitiesAPI(&Dummy);
-
 	
-	Result = SmsLiteInit( CallbackWrapper );
+	
+	Result = SmsLiteInit( LiteControlCallbackWrapper );
 	if( Result != SMSHOSTLIB_ERR_OK)
 	{
 		Error << "SmsLiteMsLibInit() result: " << Result;
 		return;
 	}
 	
-	//	note: this tried to call 12121200 so 3rd param maybe different
+	//	gr: these aren't used, must just have one extra param
 	uint32 Param3 = 0x34343434;
 	uint32 Param4 = 0x56565656;
 	uint32 Param5 = 0x78787878;
 	Result = SmsLiteAdrInit( DeviceMode,
-							 SmsLiteMsControlRxCallback,
-							 DataCallbackWrapper,
-							 OnDeviceChanged, Param3, Param4, Param5
+							ControlCallbackWrapper,
+							DataCallbackWrapper,
+							OnDeviceChanged, Param3, Param4, Param5
 							);
 	if( Result != SMSHOSTLIB_ERR_OK)
 	{
@@ -675,7 +699,7 @@ TSianoLib::TSianoLib(std::stringstream& Error) :
 	
 	Start();
 }
-		
+
 bool TSianoLib::Iteration()
 {
 	bool DoInit = false;
@@ -692,14 +716,15 @@ bool TSianoLib::Iteration()
 		std::this_thread::sleep_for( std::chrono::milliseconds(3000) );
 		OnInit();
 	}
-
+	
 	return true;
 }
+
 
 void TSianoLib::OnInit()
 {
 	std::stringstream Error;
-
+	
 	//	get version first
 	if ( true )
 	{
@@ -722,50 +747,50 @@ void TSianoLib::OnInit()
 		SmsMsg.msgData[0] = DeviceMode;
 		
 		SmsLiteAdrWriteMsg( (SmsMsgData_ST*)&SmsMsg );
-	
+		
 	}
-/*
-	//	Set crystal message
-	if ( Crystal != SMSHOSTLIB_DEFAULT_CRYSTAL )
-	{
-		SmsMsgData3Args_ST SmsMsg = {0};
-		SMS_SET_HOST_DEVICE_STATIC_MSG_FIELDS( &SmsMsg );
-		SmsMsg.xMsgHeader.msgType  = MSG_SMS_NEW_CRYSTAL_REQ;
-		SmsMsg.xMsgHeader.msgLength = (UINT16)sizeof(SmsMsg);
-		
-		SmsMsg.msgData[0] = Crystal;
-		
-		mSyncFlag = false;
-		SmsLiteSendCtrlMsg( (SmsMsgData_ST*)&SmsMsg );
-		
-		// Wait for device init response
-		if ( !SmsHostWaitForFlagSet( &mSyncFlag, 200 ) )
-		{
-			Error << "Failed to set crystal";
-			return;
-		}
-	}
-	
 	/*
-	SMSHOSTLIBLITE_MS_INITLIB_PARAMS_ST InitLibParams = {0};
-	
-	//Initialize SMS11xx host library.
-	InitLibParams.Size = sizeof(InitLibParams);
-	InitLibParams.pCtrlCallback = CallbackWrapper;
-	InitLibParams.pDataCallback = DataCallbackWrapper;
-	InitLibParams.Crystal = Crystal;
-	#ifdef TUNER_ISDB_T
-	InitLibParams.DeviceMode = SMSHOSTLIB_DEVMD_ISDBT;
-	#else
-	InitLibParams.DeviceMode = SMSHOSTLIB_DEVMD_DVBT;
-	#endif
-	auto Result = SmsLiteMsLibInit(&InitLibParams);
-	if( Result !=SMSHOSTLIB_ERR_OK)
-	{
-		Error << "SmsLiteMsLibInit() result: " << Result;
-		return;
-	}	
-	*/
+	 //	Set crystal message
+	 if ( Crystal != SMSHOSTLIB_DEFAULT_CRYSTAL )
+	 {
+	 SmsMsgData3Args_ST SmsMsg = {0};
+	 SMS_SET_HOST_DEVICE_STATIC_MSG_FIELDS( &SmsMsg );
+	 SmsMsg.xMsgHeader.msgType  = MSG_SMS_NEW_CRYSTAL_REQ;
+	 SmsMsg.xMsgHeader.msgLength = (UINT16)sizeof(SmsMsg);
+	 
+	 SmsMsg.msgData[0] = Crystal;
+	 
+	 mSyncFlag = false;
+	 SmsLiteSendCtrlMsg( (SmsMsgData_ST*)&SmsMsg );
+	 
+	 // Wait for device init response
+	 if ( !SmsHostWaitForFlagSet( &mSyncFlag, 200 ) )
+	 {
+	 Error << "Failed to set crystal";
+	 return;
+	 }
+	 }
+	 
+	 /*
+	 SMSHOSTLIBLITE_MS_INITLIB_PARAMS_ST InitLibParams = {0};
+	 
+	 //Initialize SMS11xx host library.
+	 InitLibParams.Size = sizeof(InitLibParams);
+	 InitLibParams.pCtrlCallback = CallbackWrapper;
+	 InitLibParams.pDataCallback = DataCallbackWrapper;
+	 InitLibParams.Crystal = Crystal;
+	 #ifdef TUNER_ISDB_T
+	 InitLibParams.DeviceMode = SMSHOSTLIB_DEVMD_ISDBT;
+	 #else
+	 InitLibParams.DeviceMode = SMSHOSTLIB_DEVMD_DVBT;
+	 #endif
+	 auto Result = SmsLiteMsLibInit(&InitLibParams);
+	 if( Result !=SMSHOSTLIB_ERR_OK)
+	 {
+	 Error << "SmsLiteMsLibInit() result: " << Result;
+	 return;
+	 }
+	 */
 }
 
 TSianoLib::~TSianoLib()
@@ -774,148 +799,132 @@ TSianoLib::~TSianoLib()
 }
 
 
-// Data callback function. This function is being given to SMS11xx host library
-//as a callback for data.
-void TSianoLib::IsdbtUserDataCallback(UINT32 ServiceDevHandle,UINT8* pBuf,UINT32 BufSize)
+void TSianoLib::OnDataCallback(ArrayBridge<char> &&Buffer)
 {
-	//UINT32 Now;
-	int BufferSize = BufSize;
-	auto BufferArray = GetRemoteArray( pBuf, BufferSize, BufferSize );
-	
-	Array<uint8> Data;
-	Data.PushBackArray( BufferArray );
-	mDataCallbacks.PushBack( Data );
-	
-//	g_IsdbtState.Stats.NumBytes += BufSize;
-//	g_IsdbtState.Stats.NumCallbacks++;
+	std::Debug << "Incoming data: " << Soy::FormatSizeBytes( Buffer.GetDataSize() ) << std::endl;
 }
 
-void TSianoLib::IsdbtUserCtrlCallback( SMSHOSTLIB_MSG_TYPE_RES_E	MsgType,
-									SMSHOSTLIB_ERR_CODES_E		ErrCode,
-									void* 						pPayload,
-									UINT32						PayloadLen)
-
+void TSianoLib::OnLiteControlCallback(SMSHOSTLIB_MSG_TYPE_RES_E	MsgType,SMSHOSTLIB_ERR_CODES_E ErrCode,ArrayBridge<char>&& Payload)
 {
 	//Handle indications.
-	switch(MsgType)
+	switch ( MsgType )
 	{
 		case SMSHOSTLIB_MSG_GET_VERSION_RES:
 		{
-			std::string VersionString( static_cast<const char*>(pPayload) );
+			std::string VersionString( Payload.GetArray() );
 			std::Debug << "TSTV:SIANO: [sms]Version:" << VersionString << std::endl;
 		}
-		return;
+			break;
 			
 		case SMSHOSTLIB_MSG_SMS_SIGNAL_DETECTED_IND:
-			g_bHaveSignalIndicator = true;
-			g_IsdbtState.Signal_exist = true;
+			OnDetectedSignal( Payload );
+			//g_bHaveSignalIndicator = true;
+			//g_IsdbtState.Signal_exist = true;
 			//		OSW_EventSet(&g_IsdbtState.hTuneEvent);
 			std::Debug << "TSTV:SIANO: SMSHOSTLIB_MSG_SMS_SIGNAL_DETECTED_IND !!!" << std::endl;
-			return;
+			break;
 			
 		case SMSHOSTLIB_MSG_SMS_NO_SIGNAL_IND:
-			g_bHaveSignalIndicator = true;
-			g_IsdbtState.Signal_exist = false;
+			OnNoSignal( Payload );
+			//g_bHaveSignalIndicator = true;
+			//g_IsdbtState.Signal_exist = false;
 			//		OSW_EventSet(&g_IsdbtState.hTuneEvent);
 			std::Debug << "TSTV:SIANO: SMSHOSTLIB_MSG_SMS_NO_SIGNAL_IND !!!\n" << std::endl;
-			return;
-
+			break;
+			
 		case SMSHOSTLIB_MSG_GET_STATISTICS_EX_RES:
 		{
-			SMSHOSTLIB_STATISTICS_ISDBT_ST* pStat = (SMSHOSTLIB_STATISTICS_ISDBT_ST*)pPayload;
+			auto* Stats = reinterpret_cast<SMSHOSTLIB_STATISTICS_ISDBT_ST*>( Payload.GetArray() );
+			OnStats( *Stats );
 			
-			g_SignalQuality = (char)GetReceptionQuality(pStat);
-			g_SignalStrength = pStat->InBandPwr;
-			
-			g_SNR = pStat->SNR;
-			g_BER = pStat->LayerInfo[0].BER;
-			g_RSSI = pStat->RSSI;
-			g_InBandPower = pStat->InBandPwr;
-			
-			std::Debug << "TSTV:SIANO: g_SignalQuality==" << g_SignalQuality << std::endl;
-			std::Debug << "TSTV:SIANO: g_SignalStrength==" << g_SignalStrength << std::endl;
-			std::Debug << "TSTV:SIANO: g_SNR==" << g_SNR << std::endl;
-			std::Debug << "TSTV:SIANO: g_BER==" << g_BER << std::endl;
-			std::Debug << "TSTV:SIANO: g_RSSI==" << g_RSSI << std::endl;
+			/*
+			 g_SignalQuality = (char)GetReceptionQuality(pStat);
+			 g_SignalStrength = pStat->InBandPwr;
+			 
+			 g_SNR = pStat->SNR;
+			 g_BER = pStat->LayerInfo[0].BER;
+			 g_RSSI = pStat->RSSI;
+			 g_InBandPower = pStat->InBandPwr;
+			 
+			 std::Debug << "TSTV:SIANO: g_SignalQuality==" << g_SignalQuality << std::endl;
+			 std::Debug << "TSTV:SIANO: g_SignalStrength==" << g_SignalStrength << std::endl;
+			 std::Debug << "TSTV:SIANO: g_SNR==" << g_SNR << std::endl;
+			 std::Debug << "TSTV:SIANO: g_BER==" << g_BER << std::endl;
+			 std::Debug << "TSTV:SIANO: g_RSSI==" << g_RSSI << std::endl;
+			 */
 		}
-			return ;
+			break;
 			
 		case SMSHOSTLIB_MSG_GET_STATISTICS_RES:
 		{
-			SMSHOSTLIB_FAST_STATISTICS_ST* pStat = (SMSHOSTLIB_FAST_STATISTICS_ST*)pPayload;
+			auto* Stats = reinterpret_cast<SMSHOSTLIB_FAST_STATISTICS_ST*>( Payload.GetArray() );
+			OnStats( *Stats );
 			/*
-			if (TRUE==pStat->DemodLocked){
-				g_SignalQuality = (char)GetDvbtReceptionQuality(pStat);
-			} else {
-				g_SignalQuality = 0;
-			}
-			g_SignalStrength = (char)pStat->InBandPwr;
-			g_SNR = pStat->SNR;
-			g_BER = pStat->BER;
-			g_InBandPower=pStat->InBandPwr;
-			printk("TSTV:SIANO: [SMS]Lock=%d, InBandPwr=%d, SNR=%d, BER=%d ValidTsPak=%d, ErrTsPak=%d\n",pStat->DemodLocked,pStat->InBandPwr, pStat->SNR, pStat->BER,pStat->TotalTSPackets,pStat->ErrorTSPackets);
-			
-			if (pStat->DemodLocked == TRUE )
-			{      g_bDummyHaveSignal = TRUE;
-				g_IsdbtState.Signal_exist = TRUE;
-			}
+			 if (TRUE==pStat->DemodLocked){
+			 g_SignalQuality = (char)GetDvbtReceptionQuality(pStat);
+			 } else {
+			 g_SignalQuality = 0;
+			 }
+			 g_SignalStrength = (char)pStat->InBandPwr;
+			 g_SNR = pStat->SNR;
+			 g_BER = pStat->BER;
+			 g_InBandPower=pStat->InBandPwr;
+			 printk("TSTV:SIANO: [SMS]Lock=%d, InBandPwr=%d, SNR=%d, BER=%d ValidTsPak=%d, ErrTsPak=%d\n",pStat->DemodLocked,pStat->InBandPwr, pStat->SNR, pStat->BER,pStat->TotalTSPackets,pStat->ErrorTSPackets);
+			 
+			 if (pStat->DemodLocked == TRUE )
+			 {      g_bDummyHaveSignal = TRUE;
+			 g_IsdbtState.Signal_exist = TRUE;
+			 }
 			 */
 		}
-		return ;
+			break;
 			
 		default:
 			break;
 	}
-	
-	
-	
-	if(MsgType != g_IsdbtState.ExpectedResponse)
-	{
-		return;
-	}
-	
-	//
-	//Handle expected response arrival.
-	//
-	
-	//Copy error code.
-	g_IsdbtState.ErrCode = ErrCode;
-	
-	//Copy payload length.
-	g_IsdbtState.PayloadLen = PayloadLen;
-	
-	//Copy payload.
-	if(g_IsdbtState.PayloadLen)
-	{
-		//	if((g_IsdbtState.pPayload = OswLiteMemAlloc(g_IsdbtState.PayloadLen)) == NULL)
-		//	{
-		//		printf("Allocation failed\n");
-		//		exit(1);
-		//	}
-		
-		//	memcpy(g_IsdbtState.pPayload, pPayload, g_IsdbtState.PayloadLen);
-	}
-	
-	//Set response event.
-	//	OSW_EventSet(&g_IsdbtState.hResponseEvent);
+}
+
+
+
+void TSianoLib::OnNewCrystal(const ArrayBridge<char>& Data)
+{
+	std::Debug << __func__ << std::endl;
+}
+
+void TSianoLib::OnDeviceInitialised(const ArrayBridge<char>& Data)
+{
+	std::Debug << __func__ << std::endl;
+}
+
+void TSianoLib::OnNoSignal(const ArrayBridge<char>& Payload)
+{
+	std::Debug << __func__ << std::endl;
+}
+
+void TSianoLib::OnDetectedSignal(const ArrayBridge<char>& Payload)
+{
+	std::Debug << __func__ << std::endl;
+}
+
+void TSianoLib::OnStats(const TRANSMISSION_STATISTICS_ST& Stats)
+{
+	std::Debug << __func__ << std::endl;
+}
+
+void TSianoLib::OnStats(const SMSHOSTLIB_STATISTICS_ISDBT_ST& Stats)
+{
+	std::Debug << __func__ << std::endl;
+}
+
+void TSianoLib::OnStats(const SMSHOSTLIB_FAST_STATISTICS_ST& Stats)
+{
 	
 }
 
 
 
-
-
-
-
-
-
-
-
-
-
-
 SianoContainer::SianoContainer() :
-	SoyWorkerThread	( "SianoContainer", SoyWorkerWaitMode::Sleep )
+SoyWorkerThread	( "SianoContainer", SoyWorkerWaitMode::Sleep )
 {
 	std::stringstream Error;
 	if ( !CreateContext(Error) )
@@ -938,7 +947,7 @@ SianoContainer::~SianoContainer()
 
 bool SianoContainer::InitLib(std::stringstream& Error)
 {
-
+	
 	
 	return true;
 }
@@ -973,19 +982,19 @@ bool SianoContainer::CreateContext(std::stringstream& Error)
 bool SianoContainer::Iteration()
 {
 	/*
-	std::lock_guard<std::recursive_mutex> Lock(mContextLock);
-
-	//	gr: use this for the thread block
-	int TimeoutMs = 10;
-	int TimeoutSecs = 0;
-	int TimeoutMicroSecs = TimeoutMs*1000;
-	timeval Timeout = {TimeoutSecs,TimeoutMicroSecs};
-	auto Result = freenect_process_events_timeout( mContext, &Timeout );
-	if ( Result < 0 )
-	{
-		std::Debug << "Freenect_events error: " << Result;
-	}
-*/
+	 std::lock_guard<std::recursive_mutex> Lock(mContextLock);
+	 
+	 //	gr: use this for the thread block
+	 int TimeoutMs = 10;
+	 int TimeoutSecs = 0;
+	 int TimeoutMicroSecs = TimeoutMs*1000;
+	 timeval Timeout = {TimeoutSecs,TimeoutMicroSecs};
+	 auto Result = freenect_process_events_timeout( mContext, &Timeout );
+	 if ( Result < 0 )
+	 {
+	 std::Debug << "Freenect_events error: " << Result;
+	 }
+	 */
 	return true;
 }
 
@@ -997,8 +1006,8 @@ std::shared_ptr<TVideoDevice> SianoContainer::AllocDevice(const TVideoDeviceMeta
 
 
 SianoDevice::SianoDevice(const std::string& Serial,std::stringstream& Error) :
-	TVideoDevice	( Serial, Error ),
-	mSerial			( Serial )
+TVideoDevice	( Serial, Error ),
+mSerial			( Serial )
 {
 	Open(Error);
 }
@@ -1023,15 +1032,15 @@ void SianoDevice::OnVideo(void *rgb, uint32_t timestamp)
 	if ( !Soy::Assert( rgb, "rgb data expected" ) )
 		return;
 	/*
-	//std::Debug << "On video " << timestamp << std::endl;
-
-	auto& Pixels = mVideoBuffer.GetPixelsArray();
-	int Bytes = std::min( mVideoMode.bytes, Pixels.GetDataSize() );
-	memcpy( Pixels.GetArray(), rgb, Bytes );
-
-	//	notify change
-	SoyTime Timecode( static_cast<uint64>(timestamp) );
-	OnNewFrame( mVideoBuffer, Timecode );
+	 //std::Debug << "On video " << timestamp << std::endl;
+	 
+	 auto& Pixels = mVideoBuffer.GetPixelsArray();
+	 int Bytes = std::min( mVideoMode.bytes, Pixels.GetDataSize() );
+	 memcpy( Pixels.GetArray(), rgb, Bytes );
+	 
+	 //	notify change
+	 SoyTime Timecode( static_cast<uint64>(timestamp) );
+	 OnNewFrame( mVideoBuffer, Timecode );
 	 */
 }
 
