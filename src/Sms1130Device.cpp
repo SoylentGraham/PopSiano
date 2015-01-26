@@ -38,6 +38,7 @@ std::map<SmsMsgTypes::Type,std::string> SmsMsgTypes::EnumMap =
 {
 	DEFINE_SOYENUM( MSG_SMS_GET_VERSION_EX_REQ ),
 	DEFINE_SOYENUM( MSG_SMS_GET_VERSION_EX_RES ),
+	DEFINE_SOYENUM( MSG_SMS_GET_VERSION_RES ),
 	DEFINE_SOYENUM( MSG_SMS_GET_VERSION_REQ ),
 	DEFINE_SOYENUM( MSG_SMS_TRANSMISSION_IND ),
 	DEFINE_SOYENUM( MSG_SMS_PID_STATISTICS_IND ),
@@ -126,7 +127,8 @@ public:
 	void				OnDeviceInitialised(const ArrayBridge<char>& Data);
 	void				OnNoSignal(const ArrayBridge<char>& Payload);
 	void				OnDetectedSignal(const ArrayBridge<char>& Payload);
-	
+	void				OnHandoverPerSlicesIndication(const ArrayBridge<char>& Payload);
+
 	void				OnStats(const TRANSMISSION_STATISTICS_ST& Stats);
 	void				OnStats(const SMSHOSTLIB_STATISTICS_ISDBT_ST& Stats);
 	void				OnStats(const SMSHOSTLIB_FAST_STATISTICS_ST& Stats);
@@ -305,13 +307,10 @@ void TSianoLib::OnControlCallback(ArrayBridge<char>&& Buffer)
 	switch( MsgType )
 	{
 		case MSG_SMS_NEW_CRYSTAL_RES:
-			//g_LibMsState.SyncFlag = TRUE;
-			std::Debug << "new crystal" << std::endl;
 			OnNewCrystal( Buffer );
 			break;
 			
 		case MSG_SMS_INIT_DEVICE_RES:
-			std::Debug << "init device res" << std::endl;
 			OnDeviceInitialised( Buffer );
 			break;
 			
@@ -331,10 +330,9 @@ void TSianoLib::OnControlCallback(ArrayBridge<char>&& Buffer)
 			
 			
 		case MSG_SMS_HO_PER_SLICES_IND:
-		{
 			// Update the DVBT statistics. No need for a response to the app.
 			//SmsHandlePerSlicesIndication(pSmsMsg);
-		}
+			OnHandoverPerSlicesIndication( GetArrayBridge(Payload) );
 			break;
 			
 		case MSG_SMS_SIGNAL_DETECTED_IND:
@@ -411,6 +409,7 @@ void TSianoLib::OnControlCallback(ArrayBridge<char>&& Buffer)
 			break;
 			
 		default:
+			std::Debug << "Passing " << MsgType << " to common SmsLite handler" << std::endl;
 			SmsLiteCommonControlRxHandler( GetHandleNumber(), reinterpret_cast<UINT8*>(Buffer.GetArray()), Buffer.GetDataSize() );
 			break;
 	}
@@ -483,11 +482,18 @@ public:
 	std::string	mFirmwareFilename;
 };
 
-TUsbDeviceIdentifier Devices[] =
+TUsbDeviceIdentifier gDevices[] =
 {
 	TUsbDeviceIdentifier( SanioVendor, SanioProduct, "firmware/dvb_nova_12mhz_b0.fw" ),
 };
 
+	
+	
+	
+	
+	
+	
+	
 class RegisterUsbStruct
 {
 public:
@@ -505,9 +511,9 @@ public:
 	static int		DownloadFirmware(FirmwareDownloadParams a)
 	{
 		TUsbDeviceIdentifier* Device = nullptr;
-		for ( int d=0;	d<sizeofarray(Devices);	d++ )
+		for ( int d=0;	d<sizeofarray(gDevices);	d++ )
 		{
-			auto& Dev = Devices[d];
+			auto& Dev = gDevices[d];
 			if ( Dev.mProduct != a.mProduct )
 				continue;
 			if ( Dev.mVendor != a.mVendor )
@@ -529,13 +535,13 @@ public:
 	static uint32		CountDevices(CountDevicesParams a)
 	{
 		std::Debug << "CountDevices()" << std::endl;
-		return sizeofarray(Devices);
+		return sizeofarray(gDevices);
 	}
 	
 	static int		TryRegister(TryRegisterDeviceParams a)
 	{
-		*a.mProduct = Devices[a.mDeviceIndex].mProduct;
-		*a.mVendor = Devices[a.mDeviceIndex].mVendor;
+		*a.mProduct = gDevices[a.mDeviceIndex].mProduct;
+		*a.mVendor = gDevices[a.mDeviceIndex].mVendor;
 		
 		std::Debug << "TryRegister(" << (int)a.mDeviceIndex << ") ";
 		std::Debug << "[c]" << a.c << " ";
@@ -725,8 +731,7 @@ void TSianoLib::OnInit()
 {
 	std::stringstream Error;
 	
-	//	get version first
-	if ( true )
+	//	get versions
 	{
 		SmsMsgData_ST SmsMsg = {0};
 		SMS_SET_HOST_DEVICE_STATIC_MSG_FIELDS( &SmsMsg );
@@ -737,7 +742,18 @@ void TSianoLib::OnInit()
 		SmsMsg.xMsgHeader.msgLength = sizeof(SmsMsg);
 		SmsLiteAdrWriteMsg( &SmsMsg );
 	}
-	
+
+	{
+		SmsMsgData_ST SmsMsg = {0};
+		SMS_SET_HOST_DEVICE_STATIC_MSG_FIELDS( &SmsMsg );
+		SmsMsg.xMsgHeader.msgSrcId = SMS_HOST_LIB_INTERNAL;
+		SmsMsg.xMsgHeader.msgDstId = HIF_TASK;
+		SmsMsg.xMsgHeader.msgFlags = 0;
+		SmsMsg.xMsgHeader.msgType  = MSG_SMS_GET_VERSION_REQ;
+		SmsMsg.xMsgHeader.msgLength = sizeof(SmsMsg);
+		SmsLiteAdrWriteMsg( &SmsMsg );
+	}
+
 	
 	{
 		SmsMsgData3Args_ST SmsMsg = {0};
@@ -745,9 +761,7 @@ void TSianoLib::OnInit()
 		SmsMsg.xMsgHeader.msgType  = MSG_SMS_INIT_DEVICE_REQ;
 		SmsMsg.xMsgHeader.msgLength = sizeof(SmsMsg);
 		SmsMsg.msgData[0] = DeviceMode;
-		
 		SmsLiteAdrWriteMsg( (SmsMsgData_ST*)&SmsMsg );
-		
 	}
 	/*
 	 //	Set crystal message
@@ -812,7 +826,7 @@ void TSianoLib::OnLiteControlCallback(SMSHOSTLIB_MSG_TYPE_RES_E	MsgType,SMSHOSTL
 		case SMSHOSTLIB_MSG_GET_VERSION_RES:
 		{
 			std::string VersionString( Payload.GetArray() );
-			std::Debug << "TSTV:SIANO: [sms]Version:" << VersionString << std::endl;
+			std::Debug << "Version:" << VersionString << std::endl;
 		}
 			break;
 			
@@ -821,7 +835,6 @@ void TSianoLib::OnLiteControlCallback(SMSHOSTLIB_MSG_TYPE_RES_E	MsgType,SMSHOSTL
 			//g_bHaveSignalIndicator = true;
 			//g_IsdbtState.Signal_exist = true;
 			//		OSW_EventSet(&g_IsdbtState.hTuneEvent);
-			std::Debug << "TSTV:SIANO: SMSHOSTLIB_MSG_SMS_SIGNAL_DETECTED_IND !!!" << std::endl;
 			break;
 			
 		case SMSHOSTLIB_MSG_SMS_NO_SIGNAL_IND:
@@ -829,7 +842,6 @@ void TSianoLib::OnLiteControlCallback(SMSHOSTLIB_MSG_TYPE_RES_E	MsgType,SMSHOSTL
 			//g_bHaveSignalIndicator = true;
 			//g_IsdbtState.Signal_exist = false;
 			//		OSW_EventSet(&g_IsdbtState.hTuneEvent);
-			std::Debug << "TSTV:SIANO: SMSHOSTLIB_MSG_SMS_NO_SIGNAL_IND !!!\n" << std::endl;
 			break;
 			
 		case SMSHOSTLIB_MSG_GET_STATISTICS_EX_RES:
@@ -900,8 +912,13 @@ void TSianoLib::OnNoSignal(const ArrayBridge<char>& Payload)
 {
 	std::Debug << __func__ << std::endl;
 }
-
+	
 void TSianoLib::OnDetectedSignal(const ArrayBridge<char>& Payload)
+{
+	std::Debug << __func__ << std::endl;
+}
+	
+void TSianoLib::OnHandoverPerSlicesIndication(const ArrayBridge<char>& Payload)
 {
 	std::Debug << __func__ << std::endl;
 }
